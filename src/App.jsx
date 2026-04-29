@@ -1,16 +1,21 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
+  Home, 
+  Map as MapIcon, 
+  List, 
   Trophy, 
-  MapPin, 
   TrendingUp, 
   Calendar, 
   ArrowUpRight, 
   Search, 
   CheckCircle2,
-  Mountain,
+  Mountain as MountainIcon,
   Users,
-  Flag
+  Flag,
+  X,
+  ChevronRight,
+  Info
 } from 'lucide-react';
 import {
   ComposableMap,
@@ -21,13 +26,12 @@ import {
 import hikingData from './data/hiking_data.json';
 import './index.css';
 
-// South Korea GeoJSON URL (GeoJSON is better than TopoJSON for direct use)
 const geoUrl = "https://raw.githubusercontent.com/southkorea/southkorea-maps/master/kostat/2013/json/skorea_provinces_geo.json";
 
 const App = () => {
-  const [activeTab, setActiveTab] = useState('all'); 
+  const [activeTab, setActiveTab] = useState('home'); 
+  const [selectedMountain, setSelectedMountain] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [tooltip, setTooltip] = useState(null);
 
   const mountains = hikingData.mountains || [];
   const logs = hikingData.logs || [];
@@ -46,297 +50,292 @@ const App = () => {
   }, [mountains, logs]);
 
   const filteredMountains = useMemo(() => {
-    return mountains.filter(m => {
-      const matchesSearch = (m.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (m.province || "").toLowerCase().includes(searchTerm.toLowerCase());
-      const isCompleted = m.climb_date && m.climb_date !== 'null';
-      
-      if (activeTab === 'completed') return matchesSearch && isCompleted;
-      if (activeTab === 'pending') return matchesSearch && !isCompleted;
-      return matchesSearch;
-    });
-  }, [mountains, searchTerm, activeTab]);
+    return mountains.filter(m => 
+      (m.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (m.province || "").toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [mountains, searchTerm]);
 
   return (
-    <div className="container">
-      <header className="app-header">
-        <div className="title-group">
-          <motion.h1 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            Mountain Challenge
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            대한민국 100대 명산 정복 프로젝트
-          </motion.p>
-        </div>
-        <div className="search-bar" style={{ position: 'relative' }}>
-          <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-          <input 
-            type="text" 
-            placeholder="산 이름 또는 지역 검색"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              padding: '0.75rem 1rem 0.75rem 2.5rem',
-              borderRadius: '12px',
-              border: '1px solid var(--border)',
-              outline: 'none',
-              width: '260px',
-              fontFamily: 'var(--font-main)'
-            }}
+    <div className="app-container">
+      <AnimatePresence mode="wait">
+        {activeTab === 'home' && (
+          <HomeSection key="home" stats={stats} recentLogs={logs.slice(0, 3)} />
+        )}
+        {activeTab === 'map' && (
+          <MapSection key="map" mountains={mountains} onSelect={setSelectedMountain} />
+        )}
+        {activeTab === 'list' && (
+          <ListSection 
+            key="list" 
+            mountains={filteredMountains} 
+            searchTerm={searchTerm} 
+            setSearchTerm={setSearchTerm}
+            onSelect={setSelectedMountain} 
           />
-        </div>
-      </header>
+        )}
+      </AnimatePresence>
 
-      <div className="stats-grid">
-        <StatCard 
-          label="등반 완료" 
-          value={stats.completed} 
-          unit={`/ ${stats.total}`} 
-          icon={<Trophy color="var(--primary)" />}
-          progress={stats.percent}
-        />
-        <StatCard 
-          label="총 누적 거리" 
-          value={stats.distance} 
-          unit="km" 
-          icon={<TrendingUp color="#34c759" />}
-        />
-        <StatCard 
-          label="총 획득 고도" 
-          value={stats.elevation} 
-          unit="m" 
-          icon={<ArrowUpRight color="#af52de" />}
-        />
-      </div>
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <MapSection 
-        mountains={mountains} 
-        setTooltip={setTooltip} 
-        tooltip={tooltip}
-      />
-
-      <div className="tabs">
-        <button 
-          className={`tab ${activeTab === 'all' ? 'active' : ''}`}
-          onClick={() => setActiveTab('all')}
-        >
-          전체
-        </button>
-        <button 
-          className={`tab ${activeTab === 'completed' ? 'active' : ''}`}
-          onClick={() => setActiveTab('completed')}
-        >
-          완료됨
-        </button>
-        <button 
-          className={`tab ${activeTab === 'pending' ? 'active' : ''}`}
-          onClick={() => setActiveTab('pending')}
-        >
-          미답지
-        </button>
-      </div>
-
-      <motion.div 
-        layout
-        className="mountain-grid"
-      >
-        <AnimatePresence mode='popLayout'>
-          {filteredMountains.length > 0 ? (
-            filteredMountains.map((m, idx) => (
-              <MountainCard key={m.id || idx} mountain={m} />
-            ))
-          ) : (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="empty-state"
-              style={{ gridColumn: '1 / -1' }}
-            >
-              <Mountain size={48} style={{ marginBottom: '1rem', opacity: 0.2 }} />
-              <p>검색 결과가 없습니다.</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+      <AnimatePresence>
+        {selectedMountain && (
+          <BottomSheet 
+            mountain={selectedMountain} 
+            onClose={() => setSelectedMountain(null)} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
-const MapSection = ({ mountains, setTooltip, tooltip }) => {
-  return (
-    <section className="map-section">
-      <h2 className="map-title">전국 명산 등반 지도</h2>
-      <div className="map-container">
-        <ComposableMap
-          projection="geoMercator"
-          projectionConfig={{
-            rotate: [-127.5, -36.0, 0],
-            scale: 5500
-          }}
-          style={{ width: "100%", height: "100%" }}
-        >
-          <Geographies geography={geoUrl}>
-            {({ geographies }) =>
-              geographies.map((geo) => (
-                <Geography
-                  key={geo.rsmKey}
-                  geography={geo}
-                  fill="#ffffff"
-                  stroke="#e5e5ea"
-                  strokeWidth={0.5}
-                  style={{
-                    default: { outline: "none" },
-                    hover: { fill: "#f2f2f7", outline: "none" },
-                    pressed: { outline: "none" },
-                  }}
-                />
-              ))
-            }
-          </Geographies>
+const BottomNav = ({ activeTab, setActiveTab }) => (
+  <nav className="bottom-nav">
+    <NavItem 
+      id="home" 
+      label="홈" 
+      icon={<Home size={20} />} 
+      isActive={activeTab === 'home'} 
+      onClick={() => setActiveTab('home')} 
+    />
+    <NavItem 
+      id="map" 
+      label="지도" 
+      icon={<MapIcon size={20} />} 
+      isActive={activeTab === 'map'} 
+      onClick={() => setActiveTab('map')} 
+    />
+    <NavItem 
+      id="list" 
+      label="목록" 
+      icon={<List size={20} />} 
+      isActive={activeTab === 'list'} 
+      onClick={() => setActiveTab('list')} 
+    />
+  </nav>
+);
 
-          {mountains.map((m, idx) => {
-            const isCompleted = m.climb_date && m.climb_date !== 'null';
-            if (!m.lng || !m.lat) return null;
-            return (
-              <Marker 
-                key={idx} 
-                coordinates={[m.lng, m.lat]}
-                onMouseEnter={() => setTooltip(m)}
-                onMouseLeave={() => setTooltip(null)}
-              >
-                <motion.g
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: idx * 0.005 }}
-                  className="marker"
-                >
-                  {isCompleted ? (
-                    <Flag 
-                      size={14} 
-                      className="marker-flag" 
-                      style={{ transform: 'translate(-7px, -14px)' }} 
-                    />
-                  ) : (
-                    <circle r={2} className="marker-dot" />
-                  )}
-                </motion.g>
-              </Marker>
-            );
-          })}
-        </ComposableMap>
-        
-        {tooltip && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="tooltip"
-            style={{ 
-              top: '20px', 
-              right: '20px'
-            }}
-          >
-            <strong>{tooltip.name}</strong> ({tooltip.province})<br/>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              높이: {tooltip.height}m | {tooltip.climb_date && tooltip.climb_date !== 'null' ? '완료' : '미등정'}
-            </span>
-          </motion.div>
-        )}
-      </div>
-
-      <div className="map-legend">
-        <div className="legend-item">
-          <div className="dot dot-primary"></div>
-          <span>등반 완료 (깃발)</span>
-        </div>
-        <div className="legend-item">
-          <div className="dot dot-secondary"></div>
-          <span>미등정</span>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const StatCard = ({ label, value, unit, icon, progress }) => (
-  <motion.div 
-    className="card stat-card"
-    initial={{ opacity: 0, scale: 0.9 }}
-    animate={{ opacity: 1, scale: 1 }}
-    whileHover={{ y: -5 }}
-  >
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span className="stat-label">{label}</span>
+const NavItem = ({ label, icon, isActive, onClick }) => (
+  <button className={`nav-item ${isActive ? 'active' : ''}`} onClick={onClick}>
+    <div className="nav-icon-container">
       {icon}
     </div>
-    <div className="stat-value">
-      {value}<span className="stat-unit">{unit}</span>
-    </div>
-    {progress !== undefined && (
+    <span>{label}</span>
+  </button>
+);
+
+const HomeSection = ({ stats, recentLogs }) => (
+  <motion.div 
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -20 }}
+    className="content-section"
+  >
+    <header className="home-header">
+      <h1>안녕하세요 👋</h1>
+      <p>오늘도 건강한 하루 되세요.</p>
+    </header>
+
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <h3 style={{ fontSize: '1rem' }}>전체 달성률</h3>
+        <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{stats.percent}%</span>
+      </div>
       <div className="progress-container">
         <motion.div 
           className="progress-bar" 
           initial={{ width: 0 }}
-          animate={{ width: `${progress}%` }}
+          animate={{ width: `${stats.percent}%` }}
         />
       </div>
-    )}
+      <div className="stat-grid" style={{ marginTop: '1.5rem' }}>
+        <div className="stat-item">
+          <span className="stat-label">완료</span>
+          <span className="stat-value">{stats.completed}</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-label">누적 거리</span>
+          <span className="stat-value">{stats.distance}km</span>
+        </div>
+      </div>
+    </div>
+
+    <h3 style={{ margin: '1.5rem 0 1rem' }}>최근 등반 기록</h3>
+    {recentLogs.map((log, i) => (
+      <div key={i} className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className="mountain-icon" style={{ borderRadius: '50%' }}>
+          <Calendar size={18} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600 }}>{log.location}</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{log.date ? log.date.split('T')[0] : '기록 없음'}</div>
+        </div>
+        <div style={{ fontWeight: 700, color: 'var(--primary)' }}>+{log.distance}km</div>
+      </div>
+    ))}
   </motion.div>
 );
 
-const MountainCard = ({ mountain }) => {
+const MapSection = ({ mountains, onSelect }) => (
+  <motion.div 
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="map-page"
+  >
+    <div className="map-full-container">
+      <ComposableMap
+        projection="geoMercator"
+        projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: 6000 }}
+        style={{ width: "100%", height: "100%" }}
+      >
+        <Geographies geography={geoUrl}>
+          {({ geographies }) =>
+            geographies.map((geo) => (
+              <Geography
+                key={geo.rsmKey}
+                geography={geo}
+                fill="#f8f9fa"
+                stroke="#e5e5ea"
+                strokeWidth={0.5}
+                style={{ default: { outline: "none" }, hover: { fill: "#f2f2f7", outline: "none" } }}
+              />
+            ))
+          }
+        </Geographies>
+
+        {mountains.map((m, idx) => {
+          const isCompleted = m.climb_date && m.climb_date !== 'null';
+          if (!m.lng || !m.lat) return null;
+          return (
+            <Marker key={idx} coordinates={[m.lng, m.lat]} onClick={() => onSelect(m)}>
+              <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }} className="marker">
+                {isCompleted ? (
+                  <Flag size={14} className="marker-flag" style={{ transform: 'translate(-7px, -14px)' }} />
+                ) : (
+                  <circle r={2.5} className="marker-dot" />
+                )}
+              </motion.g>
+            </Marker>
+          );
+        })}
+      </ComposableMap>
+    </div>
+  </motion.div>
+);
+
+const ListSection = ({ mountains, searchTerm, setSearchTerm, onSelect }) => (
+  <motion.div 
+    initial={{ opacity: 0, x: 20 }}
+    animate={{ opacity: 1, x: 0 }}
+    exit={{ opacity: 0, x: -20 }}
+    className="content-section"
+  >
+    <div className="list-header">
+      <div style={{ position: 'relative' }}>
+        <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+        <input 
+          className="search-input" 
+          placeholder="산 이름 검색" 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+    </div>
+
+    {mountains.map((m, i) => (
+      <div 
+        key={i} 
+        className={`mountain-row ${m.climb_date && m.climb_date !== 'null' ? 'completed' : ''}`}
+        onClick={() => onSelect(m)}
+      >
+        <div className="mountain-icon">
+          {m.climb_date && m.climb_date !== 'null' ? <Trophy size={18} /> : <MountainIcon size={18} />}
+        </div>
+        <div className="mountain-row-info">
+          <div className="mountain-row-name">{m.name}</div>
+          <div className="mountain-row-meta">{m.province} • {m.height}m</div>
+        </div>
+        <ChevronRight size={18} color="var(--border)" />
+      </div>
+    ))}
+  </motion.div>
+);
+
+const BottomSheet = ({ mountain, onClose }) => {
   const isCompleted = mountain.climb_date && mountain.climb_date !== 'null';
   
   return (
-    <motion.div 
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      className={`card mountain-card ${isCompleted ? 'completed' : ''}`}
-    >
-      <div className="mountain-header">
-        <div>
-          <span className="badge badge-info">{mountain.province}</span>
-          <h3 className="mountain-name">{mountain.name}</h3>
-        </div>
-        {isCompleted && <CheckCircle2 color="var(--success)" size={24} />}
-      </div>
-      
-      <div className="mountain-info">
-        <div className="badge">{mountain.height}m</div>
-        {mountain.difficulty && <div className="badge">난이도: {mountain.difficulty}</div>}
-      </div>
+    <div className="overlay-backdrop" onClick={onClose}>
+      <motion.div 
+        className="bottom-sheet"
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="sheet-handle" />
+        <button onClick={onClose} style={{ position: 'absolute', right: '24px', top: '24px', background: 'var(--bg-page)', border: 'none', borderRadius: '50%', padding: '8px' }}>
+          <X size={20} />
+        </button>
 
-      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineBreak: 'anywhere' }}>
-        {mountain.reason || '정보 없음'}
-      </p>
-
-      <div className="mountain-footer">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <Calendar size={14} />
-          {isCompleted ? (mountain.climb_date || "").split('T')[0] : '미등정'}
-        </div>
-        {mountain.distance && mountain.distance !== 'null' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <TrendingUp size={14} />
-            {mountain.distance}km
+        <h2 className="sheet-title">{mountain.name}</h2>
+        
+        <div className="sheet-content">
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <span className="badge">{mountain.province}</span>
+            <span className="badge">{mountain.height}m</span>
+            {isCompleted && <span className="badge" style={{ background: '#e8f7ed', color: 'var(--success)' }}>등반 완료</span>}
           </div>
-        )}
-      </div>
-      
-      {mountain.companions && mountain.companions !== 'null' && (
-        <div style={{ marginTop: '12px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <Users size={14} />
-          {mountain.companions}
+
+          <div className="info-item">
+            <Info className="info-icon" size={20} />
+            <div className="info-text">
+              <h4>선정 사유</h4>
+              <p>{mountain.reason || '정보 없음'}</p>
+            </div>
+          </div>
+
+          {isCompleted && (
+            <>
+              <div className="info-item">
+                <Calendar className="info-icon" size={20} />
+                <div className="info-text">
+                  <h4>등반일</h4>
+                  <p>{mountain.climb_date.split('T')[0]}</p>
+                </div>
+              </div>
+              <div className="info-item">
+                <Users className="info-icon" size={20} />
+                <div className="info-text">
+                  <h4>동반자</h4>
+                  <p>{mountain.companions || '없음'}</p>
+                </div>
+              </div>
+            </>
+          )}
+
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
+            style={{
+              marginTop: '1rem',
+              padding: '1rem',
+              borderRadius: '16px',
+              border: 'none',
+              background: 'var(--primary)',
+              color: 'white',
+              fontWeight: 700,
+              fontSize: '1rem'
+            }}
+            onClick={onClose}
+          >
+            확인
+          </motion.button>
         </div>
-      )}
-    </motion.div>
+      </motion.div>
+    </div>
   );
 };
 
