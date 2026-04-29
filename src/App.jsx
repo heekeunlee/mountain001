@@ -18,7 +18,8 @@ import {
   Info,
   MapPin,
   Sparkles,
-  Flower2
+  Flower2,
+  Award
 } from 'lucide-react';
 import {
   ComposableMap,
@@ -31,20 +32,60 @@ import './index.css';
 
 const geoUrl = "https://raw.githubusercontent.com/southkorea/southkorea-maps/master/kostat/2013/json/skorea_provinces_geo.json";
 
-// Seasonal Recommendation Data
+// Detailed Seasonal Recommendations (Top 5-10 per month)
 const seasonalData = {
-  1: { mountain: "태백산", reason: "환상적인 눈꽃 축제와 주목 군락지의 설경이 일품입니다." },
-  2: { mountain: "소백산", reason: "칼바람 속의 은빛 눈꽃 터널을 걷는 겨울 산행의 묘미가 있습니다." },
-  3: { mountain: "지리산", reason: "섬진강변 매화와 함께 시작되는 지리산의 봄 기운을 느껴보세요." },
-  4: { mountain: "황매산", reason: "4월 말부터 시작되는 진분홍빛 철쭉 군락지가 장관을 이룹니다." },
-  5: { mountain: "바래봉", reason: "지리산 바래봉의 철쭉은 국내 최고 수준의 절경을 자랑합니다." },
-  6: { mountain: "설악산", reason: "여름의 시작, 공룡능선의 웅장함과 시원한 계곡이 반겨줍니다." },
-  7: { mountain: "덕유산", reason: "무주 구천동 계곡의 시원한 물줄기와 푸른 숲이 여름 산행지로 제격입니다." },
-  8: { mountain: "한라산", reason: "여름 구름 위를 걷는 백록담 산행과 시원한 바다 전망이 아름답습니다." },
-  9: { mountain: "오대산", reason: "국내에서 가장 먼저 단풍이 시작되는 곳으로 가을의 시작을 알립니다." },
-  10: { mountain: "내장산", reason: "아기단풍이 빚어내는 화려한 가을 색채의 향연을 만끽할 수 있습니다." },
-  11: { mountain: "민둥산", reason: "억새 꽃이 피어나는 은빛 물결의 능선이 가을 감성을 자극합니다." },
-  12: { mountain: "마니산", reason: "한 해를 마무리하며 강화도 앞바다의 낙조를 감상하기 가장 좋은 곳입니다." }
+  1: [
+    { name: "태백산", reason: "환상적인 눈꽃 축제와 천년의 주목 군락지가 빚어내는 설경이 압권입니다.", rank: 1 },
+    { name: "한라산", reason: "영실코스의 눈부신 설경과 백록담의 장엄한 겨울 풍경을 만날 수 있습니다.", rank: 2 },
+    { name: "선자령", reason: "백두대간의 능선을 따라 펼쳐지는 끝없는 설원과 풍력발전기가 이국적입니다.", rank: 3 }
+  ],
+  2: [
+    { name: "소백산", reason: "칼바람 속에서도 꿋꿋이 피어난 은빛 상고대와 눈꽃 터널이 환상적입니다.", rank: 1 },
+    { name: "덕유산", reason: "곤돌라를 타고 편하게 올라 즐기는 향적봉의 설경은 가족 산행으로 최고입니다.", rank: 2 }
+  ],
+  3: [
+    { name: "지리산", reason: "구례 산수유와 섬진강 매화가 필 무렵, 지리산의 봄 기운이 태동합니다.", rank: 1 },
+    { name: "무등산", reason: "봄의 전령사 복수초와 얼레지가 피어나는 무등산의 생명력을 느껴보세요.", rank: 2 }
+  ],
+  4: [
+    { name: "황매산", reason: "전국 최대 규모의 철쭉 군락지가 산 전체를 분홍빛으로 물들입니다.", rank: 1 },
+    { name: "비슬산", reason: "참꽃(진달래) 군락지가 끝없이 펼쳐지는 능선은 4월의 백미입니다.", rank: 2 },
+    { name: "가야산", reason: "벚꽃과 함께 어우러지는 해인사 소리길과 웅장한 암릉이 아름답습니다.", rank: 3 },
+    { name: "관악산", reason: "진달래와 철쭉이 만개하며 도심 속에서 봄 정취를 만끽하기 가장 좋습니다.", rank: 4 }
+  ],
+  5: [
+    { name: "바래봉", reason: "지리산 바래봉의 철쭉은 국내 최고 수준의 밀집도와 화려함을 자랑합니다.", rank: 1 },
+    { name: "소백산", reason: "연분홍 철쭉이 능선을 따라 끝없이 이어지는 천상의 화원을 만날 수 있습니다.", rank: 2 }
+  ],
+  6: [
+    { name: "설악산", reason: "신록이 우거진 공룡능선의 웅장함과 시원한 천불동 계곡이 매력적입니다.", rank: 1 },
+    { name: "월출산", reason: "호남의 소금강이라 불리는 암릉과 구름다리에서 즐기는 시원한 바람이 일품입니다.", rank: 2 }
+  ],
+  7: [
+    { name: "덕유산", reason: "무주 구천동 33경의 시원한 계곡물과 울창한 숲이 여름 산행지로 제격입니다.", rank: 1 },
+    { name: "방태산", reason: "이단폭포의 시원한 물줄기와 원시림이 잘 보존된 힐링 산행지입니다.", rank: 2 }
+  ],
+  8: [
+    { name: "오대산", reason: "울창한 전나무 숲길과 시원한 계곡이 있어 무더위를 피하기 가장 좋습니다.", rank: 1 },
+    { name: "치악산", reason: "사다리병창 코스의 짜릿함과 함께 즐기는 구룡사의 시원한 계곡이 유명합니다.", rank: 2 }
+  ],
+  9: [
+    { name: "설악산", reason: "대청봉에서 시작된 단풍이 공룡능선을 타고 내려오는 장관을 가장 먼저 봅니다.", rank: 1 },
+    { name: "대둔산", reason: "금강구름다리와 삼선계단 주변으로 물드는 단풍과 기암괴석의 조화가 뛰어납니다.", rank: 2 }
+  ],
+  10: [
+    { name: "내장산", reason: "단풍 터널과 아기단풍이 빚어내는 화려한 색채는 국내 가을 산행의 정점입니다.", rank: 1 },
+    { name: "주왕산", reason: "기암절벽과 어우러진 계곡의 단풍이 마치 동양화 한 폭을 보는 듯합니다.", rank: 2 },
+    { name: "북한산", reason: "화강암 암릉과 붉은 단풍이 어우러진 서울의 명산으로 가을 정취가 가득합니다.", rank: 3 }
+  ],
+  11: [
+    { name: "민둥산", reason: "억새 꽃이 피어나는 은빛 물결의 능선이 가을 감성을 자극하는 최고의 명소입니다.", rank: 1 },
+    { name: "화왕산", reason: "넓은 억새 평원과 가을 하늘이 어우러진 풍경이 사진가들에게 인기입니다.", rank: 2 }
+  ],
+  12: [
+    { name: "마니산", reason: "한 해를 마무리하며 서해바다의 장엄한 낙조를 감상하기 가장 좋은 곳입니다.", rank: 1 },
+    { name: "계방산", reason: "국내 최고의 적설량을 자랑하며, 환상적인 눈꽃 산행을 가장 먼저 즐길 수 있습니다.", rank: 2 }
+  ]
 };
 
 const App = () => {
@@ -58,7 +99,7 @@ const App = () => {
   const logs = hikingData.logs || [];
 
   const currentMonth = new Date().getMonth() + 1;
-  const recommendation = seasonalData[currentMonth];
+  const recommendations = seasonalData[currentMonth] || [];
 
   const stats = useMemo(() => {
     const completed = mountains.filter(m => m.climb_date && m.climb_date !== 'null').length;
@@ -88,7 +129,7 @@ const App = () => {
     <div className="app-container" onMouseMove={handleMouseMove}>
       <AnimatePresence mode="wait">
         {activeTab === 'home' && (
-          <HomeSection key="home" stats={stats} recentLogs={logs.slice(0, 3)} />
+          <HomeSection key="home" stats={stats} recentLogs={logs.slice(0, 5)} onSelect={setSelectedMountain} mountains={mountains} />
         )}
         {activeTab === 'map' && (
           <MapSection 
@@ -96,6 +137,7 @@ const App = () => {
             mountains={mountains} 
             onSelect={setSelectedMountain} 
             onHover={setHoveredMountain}
+            recommendations={recommendations}
           />
         )}
         {activeTab === 'list' && (
@@ -108,7 +150,12 @@ const App = () => {
           />
         )}
         {activeTab === 'recommend' && (
-          <RecommendSection key="recommend" recommendation={recommendation} mountains={mountains} onSelect={setSelectedMountain} />
+          <RecommendSection 
+            key="recommend" 
+            recommendations={recommendations} 
+            mountains={mountains} 
+            onSelect={setSelectedMountain} 
+          />
         )}
       </AnimatePresence>
 
@@ -177,7 +224,7 @@ const NavItem = ({ label, icon, isActive, onClick }) => (
   </button>
 );
 
-const HomeSection = ({ stats, recentLogs }) => (
+const HomeSection = ({ stats, recentLogs, onSelect, mountains }) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -185,8 +232,7 @@ const HomeSection = ({ stats, recentLogs }) => (
     className="content-section"
   >
     <header className="home-header">
-      <h1>안녕하세요 👋</h1>
-      <p>오늘도 건강한 하루 되세요.</p>
+      <h1>전국의 100대 명산 챌린지</h1>
     </header>
 
     <div className="card">
@@ -214,119 +260,128 @@ const HomeSection = ({ stats, recentLogs }) => (
     </div>
 
     <h3 style={{ margin: '1.5rem 0 1rem' }}>최근 등반 기록</h3>
-    {recentLogs.map((log, i) => (
+    {recentLogs.length > 0 ? recentLogs.map((log, i) => (
       <div key={i} className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
         <div className="mountain-icon" style={{ borderRadius: '50%' }}>
           <Calendar size={18} />
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600 }}>{log.location}</div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{log.date ? log.date.split('T')[0] : '기록 없음'}</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            {log.date ? log.date.split('T')[0] : '기록 없음'}
+          </div>
         </div>
-        <div style={{ fontWeight: 700, color: 'var(--primary)' }}>+{log.distance}km</div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{log.distance}km</div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>이동거리</div>
+        </div>
       </div>
-    ))}
+    )) : (
+      <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>기록된 등반이 없습니다.</p>
+    )}
   </motion.div>
 );
 
-const MapSection = ({ mountains, onSelect, onHover }) => (
-  <motion.div 
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
-    className="map-page"
-  >
-    <div className="map-full-container">
-      <div className="map-svg-container">
-        <ComposableMap
-          projection="geoMercator"
-          projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: 6500 }}
-          style={{ width: "100%", height: "100%" }}
-        >
-          <Geographies geography={geoUrl}>
-            {({ geographies }) =>
-              geographies.map((geo) => (
-                <Geography
-                  key={geo.rsmKey}
-                  geography={geo}
-                  fill="#ffffff"
-                  stroke="#adb5bd" // More vivid border
-                  strokeWidth={0.8}
-                  style={{ 
-                    default: { outline: "none" }, 
-                    hover: { fill: "#e9ecef", outline: "none" } 
-                  }}
-                />
-              ))
-            }
-          </Geographies>
+const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
+  const recommendNames = recommendations.map(r => r.name);
 
-          {mountains.map((m, idx) => {
-            const isCompleted = m.climb_date && m.climb_date !== 'null';
-            if (!m.lng || !m.lat) return null;
-            return (
-              <Marker 
-                key={idx} 
-                coordinates={[m.lng, m.lat]} 
-                onClick={() => onSelect(m)}
-                onMouseEnter={() => onHover(m)}
-                onMouseLeave={() => onHover(null)}
-              >
-                <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }} whileHover={{ scale: 1.5 }} className="marker">
-                  {isCompleted ? (
-                    <Flag size={14} className="marker-flag" style={{ transform: 'translate(-7px, -14px)' }} />
-                  ) : (
-                    <circle r={2.5} className="marker-dot" style={{ fill: '#495057', opacity: 0.5 }} />
-                  )}
-                </motion.g>
-              </Marker>
-            );
-          })}
-        </ComposableMap>
-      </div>
-    </div>
-  </motion.div>
-);
-
-const RecommendSection = ({ recommendation, mountains, onSelect }) => {
-  const mountainDetail = mountains.find(m => m.name.includes(recommendation.mountain));
-  
   return (
     <motion.div 
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 1.1 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="map-page"
+    >
+      <div className="map-full-container">
+        <div className="map-svg-container">
+          <ComposableMap
+            projection="geoMercator"
+            projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: 7500 }} // Increased scale for more zoom
+            style={{ width: "100%", height: "100%" }}
+          >
+            <Geographies geography={geoUrl}>
+              {({ geographies }) =>
+                geographies.map((geo) => (
+                  <Geography
+                    key={geo.rsmKey}
+                    geography={geo}
+                    fill="#ffffff"
+                    stroke="#86868b" 
+                    strokeWidth={0.5}
+                    style={{ 
+                      default: { outline: "none" }, 
+                      hover: { fill: "#f2f2f7", outline: "none" } 
+                    }}
+                  />
+                ))
+              }
+            </Geographies>
+
+            {mountains.map((m, idx) => {
+              const isCompleted = m.climb_date && m.climb_date !== 'null';
+              const isRecommended = recommendNames.some(name => (m.name || "").includes(name));
+              if (!m.lng || !m.lat) return null;
+              
+              return (
+                <Marker 
+                  key={idx} 
+                  coordinates={[m.lng, m.lat]} 
+                  onClick={() => onSelect(m)}
+                  onMouseEnter={() => onHover(m)}
+                  onMouseLeave={() => onHover(null)}
+                >
+                  <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }} whileHover={{ scale: 1.5 }} className="marker">
+                    {isRecommended ? (
+                      <Flag size={16} fill="#ffcc00" stroke="#000" strokeWidth={0.5} style={{ transform: 'translate(-8px, -16px)' }} />
+                    ) : isCompleted ? (
+                      <Flag size={14} className="marker-flag" style={{ transform: 'translate(-7px, -14px)' }} />
+                    ) : (
+                      <circle r={2.5} fill="#adb5bd" opacity={0.6} />
+                    )}
+                  </motion.g>
+                </Marker>
+              );
+            })}
+          </ComposableMap>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const RecommendSection = ({ recommendations, mountains, onSelect }) => {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
       className="content-section"
     >
       <header className="recommend-header">
-        <span className="season-badge">{new Date().getMonth() + 1}월 추천 테마</span>
-        <h2>지금 가기 좋은 명산 ⛰️</h2>
+        <span className="season-badge">{new Date().getMonth() + 1}월 추천 산행지 Top {recommendations.length}</span>
+        <h2>지금 꼭 가봐야 할 명산 🏆</h2>
       </header>
 
-      <div className="recommend-card">
-        <div className="mountain-icon" style={{ width: '64px', height: '64px', margin: '0 auto 1.5rem', background: 'var(--primary-bg)' }}>
-          <Flower2 size={32} />
-        </div>
-        <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{recommendation.mountain}</h3>
-        <p style={{ color: 'var(--text-secondary)' }}>{mountainDetail?.province} • {mountainDetail?.height}m</p>
-        
-        <div className="recommend-reason">
-          <p style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--text-main)' }}>
-            "{recommendation.reason}"
-          </p>
-        </div>
-
-        <button 
-          className="card" 
-          style={{ width: '100%', marginTop: '2rem', border: 'none', background: 'var(--primary)', color: 'white', fontWeight: 700 }}
-          onClick={() => onSelect(mountainDetail)}
-        >
-          상세 정보 보기
-        </button>
-      </div>
+      {recommendations.map((rec, i) => {
+        const detail = mountains.find(m => m.name.includes(rec.name));
+        return (
+          <div key={i} className="card" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', cursor: 'pointer' }} onClick={() => onSelect(detail)}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: i === 0 ? '#ffcc00' : '#f2f2f7', display: 'flex', alignItems: 'center', justifyCenter: 'center', color: i === 0 ? 'white' : 'var(--text-secondary)', fontWeight: 700 }}>
+              {rec.rank}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{rec.name}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                {rec.reason.substring(0, 40)}...
+              </div>
+            </div>
+            <ChevronRight size={18} color="var(--border)" />
+          </div>
+        );
+      })}
       
-      <div style={{ marginTop: '2rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-        <p>※ 추천 산행지는 계절별 특징과 축제 일정을 고려하여 매달 자동으로 업데이트됩니다.</p>
+      <div style={{ marginTop: '2rem', padding: '1rem', background: 'var(--primary-bg)', borderRadius: '12px', fontSize: '0.85rem', color: 'var(--primary)' }}>
+        <p>※ 추천 산행지는 계절별 특성(개화 시기, 단풍, 설경 등)을 고려하여 랭킹순으로 제공됩니다.</p>
       </div>
     </motion.div>
   );
@@ -399,6 +454,10 @@ const MapTooltip = ({ mountain, position }) => (
 const BottomSheet = ({ mountain, onClose }) => {
   const isCompleted = mountain.climb_date && mountain.climb_date !== 'null';
   if (!mountain) return null;
+
+  // Find if this mountain is in the seasonal recommendation
+  const currentMonth = new Date().getMonth() + 1;
+  const rec = (seasonalData[currentMonth] || []).find(r => mountain.name.includes(r.name));
   
   return (
     <div className="overlay-backdrop" onClick={onClose}>
@@ -415,53 +474,67 @@ const BottomSheet = ({ mountain, onClose }) => {
           <X size={20} />
         </button>
 
-        <h2 className="sheet-title">{mountain.name}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          {rec && <span className="season-badge">추천 랭킹 {rec.rank}위</span>}
+          <span className="badge">{mountain.province}</span>
+        </div>
+        <h2 className="sheet-title" style={{ marginBottom: '1.5rem' }}>{mountain.name}</h2>
         
         <div className="sheet-content">
           <div style={{ display: 'flex', gap: '8px' }}>
-            <span className="badge">{mountain.province}</span>
-            <span className="badge">{mountain.height}m</span>
-            {isCompleted && <span className="badge" style={{ background: '#e8f7ed', color: 'var(--success)' }}>등반 완료</span>}
+            <span className="badge" style={{ padding: '4px 12px' }}>해발 {mountain.height}m</span>
+            {isCompleted && <span className="badge" style={{ background: '#e8f7ed', color: 'var(--success)', padding: '4px 12px' }}>등반 완료</span>}
           </div>
+
+          {rec && (
+            <div className="info-item" style={{ background: '#fff9db', padding: '1rem', borderRadius: '12px', border: '1px solid #ffe066' }}>
+              <Sparkles className="info-icon" size={20} color="#f08c00" />
+              <div className="info-text">
+                <h4 style={{ color: '#f08c00' }}>{new Date().getMonth() + 1}월 추천 테마</h4>
+                <p style={{ fontWeight: 600 }}>{rec.reason}</p>
+              </div>
+            </div>
+          )}
 
           <div className="info-item">
             <Info className="info-icon" size={20} />
             <div className="info-text">
-              <h4>선정 사유</h4>
+              <h4>상세 정보 (선정 사유)</h4>
               <p>{mountain.reason || '정보 없음'}</p>
             </div>
           </div>
 
           {isCompleted && (
-            <>
-              <div className="info-item">
+            <div style={{ background: '#f8f9fa', padding: '1rem', borderRadius: '16px' }}>
+              <div className="info-item" style={{ marginBottom: '1rem' }}>
                 <Calendar className="info-icon" size={20} />
                 <div className="info-text">
-                  <h4>등반일</h4>
+                  <h4>최근 등반일</h4>
                   <p>{mountain.climb_date.split('T')[0]}</p>
                 </div>
               </div>
               <div className="info-item">
                 <Users className="info-icon" size={20} />
                 <div className="info-text">
-                  <h4>동반자</h4>
+                  <h4>함께한 사람</h4>
                   <p>{mountain.companions || '없음'}</p>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           <motion.button 
             whileTap={{ scale: 0.95 }}
             style={{
               marginTop: '1rem',
-              padding: '1rem',
-              borderRadius: '16px',
+              padding: '1.2rem',
+              borderRadius: '20px',
               border: 'none',
               background: 'var(--primary)',
               color: 'white',
               fontWeight: 700,
-              fontSize: '1rem'
+              fontSize: '1.1rem',
+              boxShadow: '0 8px 16px rgba(0, 122, 255, 0.2)'
             }}
             onClick={onClose}
           >
