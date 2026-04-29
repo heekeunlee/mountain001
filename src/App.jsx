@@ -9,20 +9,31 @@ import {
   Search, 
   CheckCircle2,
   Mountain,
-  Users
+  Users,
+  Flag
 } from 'lucide-react';
+import {
+  ComposableMap,
+  Geographies,
+  Geography,
+  Marker
+} from "react-simple-maps";
 import hikingData from './data/hiking_data.json';
 import './index.css';
 
+// South Korea GeoJSON URL (GeoJSON is better than TopoJSON for direct use)
+const geoUrl = "https://raw.githubusercontent.com/southkorea/southkorea-maps/master/kostat/2013/json/skorea_provinces_geo.json";
+
 const App = () => {
-  const [activeTab, setActiveTab] = useState('all'); // all, completed, pending
+  const [activeTab, setActiveTab] = useState('all'); 
   const [searchTerm, setSearchTerm] = useState('');
+  const [tooltip, setTooltip] = useState(null);
 
   const mountains = hikingData.mountains || [];
   const logs = hikingData.logs || [];
 
   const stats = useMemo(() => {
-    const completed = mountains.filter(m => m.climb_date && m.climb_date !== 'nan').length;
+    const completed = mountains.filter(m => m.climb_date && m.climb_date !== 'null').length;
     const totalDistance = logs.reduce((acc, log) => acc + (parseFloat(log.distance) || 0), 0);
     const totalElevation = logs.reduce((acc, log) => acc + (parseFloat(log.elevation_gain) || 0), 0);
     return {
@@ -36,9 +47,9 @@ const App = () => {
 
   const filteredMountains = useMemo(() => {
     return mountains.filter(m => {
-      const matchesSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          m.province.toLowerCase().includes(searchTerm.toLowerCase());
-      const isCompleted = m.climb_date && m.climb_date !== 'nan';
+      const matchesSearch = (m.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (m.province || "").toLowerCase().includes(searchTerm.toLowerCase());
+      const isCompleted = m.climb_date && m.climb_date !== 'null';
       
       if (activeTab === 'completed') return matchesSearch && isCompleted;
       if (activeTab === 'pending') return matchesSearch && !isCompleted;
@@ -53,14 +64,12 @@ const App = () => {
           <motion.h1 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
           >
             Mountain Challenge
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
           >
             대한민국 100대 명산 정복 프로젝트
           </motion.p>
@@ -105,6 +114,12 @@ const App = () => {
           icon={<ArrowUpRight color="#af52de" />}
         />
       </div>
+
+      <MapSection 
+        mountains={mountains} 
+        setTooltip={setTooltip} 
+        tooltip={tooltip}
+      />
 
       <div className="tabs">
         <button 
@@ -153,6 +168,101 @@ const App = () => {
   );
 };
 
+const MapSection = ({ mountains, setTooltip, tooltip }) => {
+  return (
+    <section className="map-section">
+      <h2 className="map-title">전국 명산 등반 지도</h2>
+      <div className="map-container">
+        <ComposableMap
+          projection="geoMercator"
+          projectionConfig={{
+            rotate: [-127.5, -36.0, 0],
+            scale: 5500
+          }}
+          style={{ width: "100%", height: "100%" }}
+        >
+          <Geographies geography={geoUrl}>
+            {({ geographies }) =>
+              geographies.map((geo) => (
+                <Geography
+                  key={geo.rsmKey}
+                  geography={geo}
+                  fill="#ffffff"
+                  stroke="#e5e5ea"
+                  strokeWidth={0.5}
+                  style={{
+                    default: { outline: "none" },
+                    hover: { fill: "#f2f2f7", outline: "none" },
+                    pressed: { outline: "none" },
+                  }}
+                />
+              ))
+            }
+          </Geographies>
+
+          {mountains.map((m, idx) => {
+            const isCompleted = m.climb_date && m.climb_date !== 'null';
+            if (!m.lng || !m.lat) return null;
+            return (
+              <Marker 
+                key={idx} 
+                coordinates={[m.lng, m.lat]}
+                onMouseEnter={() => setTooltip(m)}
+                onMouseLeave={() => setTooltip(null)}
+              >
+                <motion.g
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: idx * 0.005 }}
+                  className="marker"
+                >
+                  {isCompleted ? (
+                    <Flag 
+                      size={14} 
+                      className="marker-flag" 
+                      style={{ transform: 'translate(-7px, -14px)' }} 
+                    />
+                  ) : (
+                    <circle r={2} className="marker-dot" />
+                  )}
+                </motion.g>
+              </Marker>
+            );
+          })}
+        </ComposableMap>
+        
+        {tooltip && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="tooltip"
+            style={{ 
+              top: '20px', 
+              right: '20px'
+            }}
+          >
+            <strong>{tooltip.name}</strong> ({tooltip.province})<br/>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              높이: {tooltip.height}m | {tooltip.climb_date && tooltip.climb_date !== 'null' ? '완료' : '미등정'}
+            </span>
+          </motion.div>
+        )}
+      </div>
+
+      <div className="map-legend">
+        <div className="legend-item">
+          <div className="dot dot-primary"></div>
+          <span>등반 완료 (깃발)</span>
+        </div>
+        <div className="legend-item">
+          <div className="dot dot-secondary"></div>
+          <span>미등정</span>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const StatCard = ({ label, value, unit, icon, progress }) => (
   <motion.div 
     className="card stat-card"
@@ -180,7 +290,7 @@ const StatCard = ({ label, value, unit, icon, progress }) => (
 );
 
 const MountainCard = ({ mountain }) => {
-  const isCompleted = mountain.climb_date && mountain.climb_date !== 'nan';
+  const isCompleted = mountain.climb_date && mountain.climb_date !== 'null';
   
   return (
     <motion.div 
@@ -210,9 +320,9 @@ const MountainCard = ({ mountain }) => {
       <div className="mountain-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <Calendar size={14} />
-          {isCompleted ? mountain.climb_date.split('T')[0] : '미등정'}
+          {isCompleted ? (mountain.climb_date || "").split('T')[0] : '미등정'}
         </div>
-        {mountain.distance && mountain.distance !== 'nan' && (
+        {mountain.distance && mountain.distance !== 'null' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <TrendingUp size={14} />
             {mountain.distance}km
@@ -220,7 +330,7 @@ const MountainCard = ({ mountain }) => {
         )}
       </div>
       
-      {mountain.companions && mountain.companions !== 'nan' && (
+      {mountain.companions && mountain.companions !== 'null' && (
         <div style={{ marginTop: '12px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <Users size={14} />
           {mountain.companions}
