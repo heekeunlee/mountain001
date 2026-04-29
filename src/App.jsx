@@ -20,7 +20,8 @@ import {
   Sparkles,
   Flower2,
   Award,
-  ArrowUpCircle
+  ArrowUpCircle,
+  Map as MapIcon2
 } from 'lucide-react';
 import {
   ComposableMap,
@@ -106,9 +107,7 @@ const App = () => {
     const completedList = mountains.filter(m => m.climb_date && m.climb_date !== 'null');
     const completed = completedList.length;
     const totalDistance = logs.reduce((acc, log) => acc + (parseFloat(log.distance) || 0), 0);
-    const totalElevation = logs.reduce((acc, log) => acc + (parseFloat(log.elevation_gain) || 0), 0);
     
-    // Find the highest peak among completed mountains
     const highestPeak = completedList.length > 0 
       ? completedList.reduce((max, m) => parseInt(m.height) > parseInt(max.height) ? m : max, completedList[0])
       : null;
@@ -117,13 +116,11 @@ const App = () => {
       completed,
       total: mountains.length,
       distance: totalDistance.toFixed(1),
-      elevation: Math.round(totalElevation).toLocaleString(),
       percent: Math.round((completed / mountains.length) * 100),
       highestPeak
     };
   }, [mountains, logs]);
 
-  // Group logs by mountain and proximity in time
   const groupedLogs = useMemo(() => {
     if (!logs.length) return [];
     
@@ -132,25 +129,31 @@ const App = () => {
     
     sorted.forEach(log => {
       const lastGroup = groups[groups.length - 1];
+      const dist = parseFloat(log.distance) || 0;
+      const mountain = mountains.find(m => m.name.includes(log.location));
+      
       if (lastGroup && lastGroup.location === log.location) {
         const lastDate = new Date(lastGroup.date);
         const currDate = new Date(log.date);
         const diffDays = Math.abs(lastDate - currDate) / (1000 * 60 * 60 * 24);
         
         if (diffDays <= 2) {
-          // Merge into last group
           lastGroup.isMerged = true;
           lastGroup.endDate = lastGroup.endDate || lastGroup.date;
-          lastGroup.startDate = log.date;
-          lastGroup.totalDistance = (parseFloat(lastGroup.totalDistance || lastGroup.distance) + parseFloat(log.distance)).toFixed(1);
+          lastGroup.date = log.date; // Use earlier date as base
+          lastGroup.totalDistance = (parseFloat(lastGroup.totalDistance) + dist).toFixed(1);
           return;
         }
       }
-      groups.push({ ...log, totalDistance: log.distance });
+      groups.push({ 
+        ...log, 
+        totalDistance: dist.toFixed(1), 
+        mountainInfo: mountain 
+      });
     });
     
     return groups;
-  }, [logs]);
+  }, [logs, mountains]);
 
   const filteredMountains = useMemo(() => {
     return mountains.filter(m => 
@@ -167,7 +170,7 @@ const App = () => {
     <div className="app-container" onMouseMove={handleMouseMove}>
       <AnimatePresence mode="wait">
         {activeTab === 'home' && (
-          <HomeSection key="home" stats={stats} recentLogs={groupedLogs.slice(0, 5)} />
+          <HomeSection key="home" stats={stats} recentLogs={groupedLogs.slice(0, 5)} onSelect={setSelectedMountain} />
         )}
         {activeTab === 'map' && (
           <MapSection 
@@ -238,7 +241,7 @@ const NavItem = ({ label, icon, isActive, onClick }) => (
   </button>
 );
 
-const HomeSection = ({ stats, recentLogs }) => (
+const HomeSection = ({ stats, recentLogs, onSelect }) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -250,7 +253,7 @@ const HomeSection = ({ stats, recentLogs }) => (
     </header>
 
     <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1rem' }}>
         <h3 style={{ fontSize: '1rem' }}>전체 달성률</h3>
         <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1.2rem' }}>{stats.percent}%</span>
       </div>
@@ -279,23 +282,34 @@ const HomeSection = ({ stats, recentLogs }) => (
     </div>
 
     <h3 style={{ margin: '1.5rem 0 1rem' }}>최근 등반 기록</h3>
-    {recentLogs.length > 0 ? recentLogs.map((log, i) => (
-      <div key={i} className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-        <div className="mountain-icon" style={{ borderRadius: '50%' }}>
-          <Calendar size={18} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600 }}>{log.location}</div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            {log.isMerged ? `${log.startDate.split('T')[0]} ~ ${log.date.split('T')[0]}` : log.date.split('T')[0]}
+    {recentLogs.length > 0 ? recentLogs.map((log, i) => {
+      const companionList = log.companions && log.companions !== 'null' 
+        ? log.companions.split('/').map(name => `+${name.trim()}`).join(' ')
+        : '';
+        
+      return (
+        <div key={i} className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center', cursor: 'pointer' }} onClick={() => log.mountainInfo && onSelect(log.mountainInfo)}>
+          <div className="mountain-icon" style={{ borderRadius: '12px' }}>
+            <Calendar size={18} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{log.location}</div>
+              <span className="badge" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>{log.mountainInfo?.province}</span>
+              {log.mountainInfo?.height && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{log.mountainInfo.height}m</span>}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              {log.isMerged ? `${log.date.split('T')[0]} ~ ${log.endDate.split('T')[0]}` : log.date.split('T')[0]}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', minWidth: '100px' }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600, marginBottom: '2px' }}>{companionList}</div>
+            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{log.totalDistance}km</div>
+            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>누적 거리</div>
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{log.totalDistance}km</div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>누적 거리</div>
-        </div>
-      </div>
-    )) : (
+      );
+    }) : (
       <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>기록된 등반이 없습니다.</p>
     )}
   </motion.div>
@@ -310,7 +324,7 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
         <div className="map-svg-container">
           <ComposableMap
             projection="geoMercator"
-            projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: 9500 }} // Even more zoom
+            projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: 9500 }}
             style={{ width: "100%", height: "100%" }}
           >
             <Geographies geography={geoUrl}>
@@ -350,7 +364,6 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
           </ComposableMap>
         </div>
 
-        {/* Map Legend */}
         <div className="map-legend" style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(255,255,255,0.9)', padding: '12px', borderRadius: '12px', boxShadow: 'var(--shadow)', fontSize: '0.75rem', zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <Flag size={12} fill="var(--primary)" /> <span>등반 완료</span>
