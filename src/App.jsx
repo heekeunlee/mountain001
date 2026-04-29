@@ -19,7 +19,8 @@ import {
   MapPin,
   Sparkles,
   Flower2,
-  Award
+  Award,
+  ArrowUpCircle
 } from 'lucide-react';
 import {
   ComposableMap,
@@ -102,17 +103,54 @@ const App = () => {
   const recommendations = seasonalData[currentMonth] || [];
 
   const stats = useMemo(() => {
-    const completed = mountains.filter(m => m.climb_date && m.climb_date !== 'null').length;
+    const completedList = mountains.filter(m => m.climb_date && m.climb_date !== 'null');
+    const completed = completedList.length;
     const totalDistance = logs.reduce((acc, log) => acc + (parseFloat(log.distance) || 0), 0);
     const totalElevation = logs.reduce((acc, log) => acc + (parseFloat(log.elevation_gain) || 0), 0);
+    
+    // Find the highest peak among completed mountains
+    const highestPeak = completedList.length > 0 
+      ? completedList.reduce((max, m) => parseInt(m.height) > parseInt(max.height) ? m : max, completedList[0])
+      : null;
+
     return {
       completed,
       total: mountains.length,
       distance: totalDistance.toFixed(1),
       elevation: Math.round(totalElevation).toLocaleString(),
-      percent: Math.round((completed / mountains.length) * 100)
+      percent: Math.round((completed / mountains.length) * 100),
+      highestPeak
     };
   }, [mountains, logs]);
+
+  // Group logs by mountain and proximity in time
+  const groupedLogs = useMemo(() => {
+    if (!logs.length) return [];
+    
+    const sorted = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const groups = [];
+    
+    sorted.forEach(log => {
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && lastGroup.location === log.location) {
+        const lastDate = new Date(lastGroup.date);
+        const currDate = new Date(log.date);
+        const diffDays = Math.abs(lastDate - currDate) / (1000 * 60 * 60 * 24);
+        
+        if (diffDays <= 2) {
+          // Merge into last group
+          lastGroup.isMerged = true;
+          lastGroup.endDate = lastGroup.endDate || lastGroup.date;
+          lastGroup.startDate = log.date;
+          lastGroup.totalDistance = (parseFloat(lastGroup.totalDistance || lastGroup.distance) + parseFloat(log.distance)).toFixed(1);
+          return;
+        }
+      }
+      groups.push({ ...log, totalDistance: log.distance });
+    });
+    
+    return groups;
+  }, [logs]);
 
   const filteredMountains = useMemo(() => {
     return mountains.filter(m => 
@@ -129,7 +167,7 @@ const App = () => {
     <div className="app-container" onMouseMove={handleMouseMove}>
       <AnimatePresence mode="wait">
         {activeTab === 'home' && (
-          <HomeSection key="home" stats={stats} recentLogs={logs.slice(0, 5)} onSelect={setSelectedMountain} />
+          <HomeSection key="home" stats={stats} recentLogs={groupedLogs.slice(0, 5)} />
         )}
         {activeTab === 'map' && (
           <MapSection 
@@ -184,34 +222,10 @@ const App = () => {
 
 const BottomNav = ({ activeTab, setActiveTab }) => (
   <nav className="bottom-nav">
-    <NavItem 
-      id="home" 
-      label="홈" 
-      icon={<Home size={18} />} 
-      isActive={activeTab === 'home'} 
-      onClick={() => setActiveTab('home')} 
-    />
-    <NavItem 
-      id="map" 
-      label="지도" 
-      icon={<MapIcon size={18} />} 
-      isActive={activeTab === 'map'} 
-      onClick={() => setActiveTab('map')} 
-    />
-    <NavItem 
-      id="list" 
-      label="목록" 
-      icon={<List size={18} />} 
-      isActive={activeTab === 'list'} 
-      onClick={() => setActiveTab('list')} 
-    />
-    <NavItem 
-      id="recommend" 
-      label="추천" 
-      icon={<Sparkles size={18} />} 
-      isActive={activeTab === 'recommend'} 
-      onClick={() => setActiveTab('recommend')} 
-    />
+    <NavItem id="home" label="홈" icon={<Home size={18} />} isActive={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+    <NavItem id="map" label="지도" icon={<MapIcon size={18} />} isActive={activeTab === 'map'} onClick={() => setActiveTab('map')} />
+    <NavItem id="list" label="목록" icon={<List size={18} />} isActive={activeTab === 'list'} onClick={() => setActiveTab('list')} />
+    <NavItem id="recommend" label="추천" icon={<Sparkles size={18} />} isActive={activeTab === 'recommend'} onClick={() => setActiveTab('recommend')} />
   </nav>
 );
 
@@ -238,7 +252,7 @@ const HomeSection = ({ stats, recentLogs }) => (
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <h3 style={{ fontSize: '1rem' }}>전체 달성률</h3>
-        <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{stats.percent}%</span>
+        <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1.2rem' }}>{stats.percent}%</span>
       </div>
       <div className="progress-container">
         <motion.div 
@@ -250,11 +264,16 @@ const HomeSection = ({ stats, recentLogs }) => (
       <div className="stat-grid" style={{ marginTop: '1.5rem' }}>
         <div className="stat-item">
           <span className="stat-label">완료</span>
-          <span className="stat-value">{stats.completed}</span>
+          <div className="stat-value">
+            {stats.completed}<span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 400 }}> / {stats.total}</span>
+          </div>
         </div>
         <div className="stat-item">
-          <span className="stat-label">누적 거리</span>
-          <span className="stat-value">{stats.distance}km</span>
+          <span className="stat-label">최고 고도 (기념)</span>
+          <div className="stat-value" style={{ fontSize: '1.2rem' }}>
+            {stats.highestPeak ? stats.highestPeak.name : '없음'}
+            {stats.highestPeak && <span style={{ fontSize: '0.8rem', color: 'var(--success)', marginLeft: '4px' }}>{stats.highestPeak.height}m</span>}
+          </div>
         </div>
       </div>
     </div>
@@ -268,12 +287,12 @@ const HomeSection = ({ stats, recentLogs }) => (
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600 }}>{log.location}</div>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            {log.date ? log.date.split('T')[0] : '기록 없음'}
+            {log.isMerged ? `${log.startDate.split('T')[0]} ~ ${log.date.split('T')[0]}` : log.date.split('T')[0]}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{log.distance}km</div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>이동거리</div>
+          <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{log.totalDistance}km</div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>누적 거리</div>
         </div>
       </div>
     )) : (
@@ -286,17 +305,12 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
   const recommendNames = recommendations.map(r => r.name);
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="map-page"
-    >
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="map-page">
       <div className="map-full-container">
         <div className="map-svg-container">
           <ComposableMap
             projection="geoMercator"
-            projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: 8500 }} // Increased scale for full-screen fit
+            projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: 9500 }} // Even more zoom
             style={{ width: "100%", height: "100%" }}
           >
             <Geographies geography={geoUrl}>
@@ -308,10 +322,7 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
                     fill="#ffffff"
                     stroke="#adb5bd" 
                     strokeWidth={0.6}
-                    style={{ 
-                      default: { outline: "none" }, 
-                      hover: { fill: "#f8f9fa", outline: "none" } 
-                    }}
+                    style={{ default: { outline: "none" }, hover: { fill: "#f8f9fa", outline: "none" } }}
                   />
                 ))
               }
@@ -323,20 +334,14 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
               if (!m.lng || !m.lat) return null;
               
               return (
-                <Marker 
-                  key={idx} 
-                  coordinates={[m.lng, m.lat]} 
-                  onClick={() => onSelect(m)}
-                  onMouseEnter={() => onHover(m)}
-                  onMouseLeave={() => onHover(null)}
-                >
+                <Marker key={idx} coordinates={[m.lng, m.lat]} onClick={() => onSelect(m)} onMouseEnter={() => onHover(m)} onMouseLeave={() => onHover(null)}>
                   <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }} whileHover={{ scale: 1.5 }} className="marker">
                     {isRecommended ? (
                       <Flag size={18} fill="#ffcc00" stroke="#000" strokeWidth={0.5} style={{ transform: 'translate(-9px, -18px)' }} />
                     ) : isCompleted ? (
-                      <Flag size={16} className="marker-flag" style={{ transform: 'translate(-8px, -16px)' }} />
+                      <Flag size={16} fill="var(--primary)" stroke="#fff" strokeWidth={0.5} style={{ transform: 'translate(-8px, -16px)' }} />
                     ) : (
-                      <circle r={3.5} fill="#636366" opacity={0.8} /> // Larger and darker dots
+                      <circle r={3.5} fill="#636366" opacity={0.8} />
                     )}
                   </motion.g>
                 </Marker>
@@ -344,75 +349,57 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
             })}
           </ComposableMap>
         </div>
+
+        {/* Map Legend */}
+        <div className="map-legend" style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(255,255,255,0.9)', padding: '12px', borderRadius: '12px', boxShadow: 'var(--shadow)', fontSize: '0.75rem', zIndex: 100 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <Flag size={12} fill="var(--primary)" /> <span>등반 완료</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <Flag size={12} fill="#ffcc00" /> <span>이달의 추천</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#636366' }}></div> <span>미답지</span>
+          </div>
+        </div>
       </div>
     </motion.div>
   );
 };
 
 const RecommendSection = ({ recommendations, mountains, onSelect }) => (
-  <motion.div 
-    initial={{ opacity: 0, x: 20 }}
-    animate={{ opacity: 1, x: 0 }}
-    exit={{ opacity: 0, x: -20 }}
-    className="content-section"
-  >
+  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="content-section">
     <header className="recommend-header">
       <span className="season-badge">{new Date().getMonth() + 1}월 추천 산행지 Top {recommendations.length}</span>
       <h2>지금 꼭 가봐야 할 명산 🏆</h2>
     </header>
-
     {recommendations.map((rec, i) => {
       const detail = mountains.find(m => m.name.includes(rec.name));
       return (
         <div key={i} className="card" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', cursor: 'pointer' }} onClick={() => onSelect(detail)}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: i === 0 ? '#ffcc00' : '#f2f2f7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: i === 0 ? 'white' : 'var(--text-secondary)', fontWeight: 700 }}>
-            {rec.rank}
-          </div>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: i === 0 ? '#ffcc00' : '#f2f2f7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: i === 0 ? 'white' : 'var(--text-secondary)', fontWeight: 700 }}>{rec.rank}</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{rec.name}</div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              {rec.reason.substring(0, 40)}...
-            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{rec.reason.substring(0, 40)}...</div>
           </div>
           <ChevronRight size={18} color="var(--border)" />
         </div>
       );
     })}
-    
-    <div style={{ marginTop: '2rem', padding: '1rem', background: 'var(--primary-bg)', borderRadius: '12px', fontSize: '0.85rem', color: 'var(--primary)' }}>
-      <p>※ 추천 산행지는 계절별 특성(개화 시기, 단풍, 설경 등)을 고려하여 랭킹순으로 제공됩니다.</p>
-    </div>
   </motion.div>
 );
 
 const ListSection = ({ mountains, searchTerm, setSearchTerm, onSelect }) => (
-  <motion.div 
-    initial={{ opacity: 0, x: 20 }}
-    animate={{ opacity: 1, x: 0 }}
-    exit={{ opacity: 0, x: -20 }}
-    className="content-section"
-  >
+  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="content-section">
     <div className="list-header">
       <div style={{ position: 'relative' }}>
         <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-        <input 
-          className="search-input" 
-          placeholder="산 이름 검색" 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        <input className="search-input" placeholder="산 이름 검색" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
     </div>
-
     {mountains.map((m, i) => (
-      <div 
-        key={i} 
-        className={`mountain-row ${m.climb_date && m.climb_date !== 'null' ? 'completed' : ''}`}
-        onClick={() => onSelect(m)}
-      >
-        <div className="mountain-icon">
-          {m.climb_date && m.climb_date !== 'null' ? <Trophy size={18} /> : <MountainIcon size={18} />}
-        </div>
+      <div key={i} className={`mountain-row ${m.climb_date && m.climb_date !== 'null' ? 'completed' : ''}`} onClick={() => onSelect(m)}>
+        <div className="mountain-icon">{m.climb_date && m.climb_date !== 'null' ? <Trophy size={18} /> : <MountainIcon size={18} />}</div>
         <div className="mountain-row-info">
           <div className="mountain-row-name">{m.name}</div>
           <div className="mountain-row-meta">{m.province} • {m.height}m</div>
@@ -424,27 +411,11 @@ const ListSection = ({ mountains, searchTerm, setSearchTerm, onSelect }) => (
 );
 
 const MapTooltip = ({ mountain, position }) => (
-  <motion.div 
-    initial={{ opacity: 0, scale: 0.8 }}
-    animate={{ opacity: 1, scale: 1 }}
-    exit={{ opacity: 0, scale: 0.8 }}
-    className="map-tooltip"
-    style={{ 
-      left: position.x + 20, 
-      top: position.y - 60 
-    }}
-  >
+  <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="map-tooltip" style={{ left: position.x + 20, top: position.y - 60 }}>
     <h4>{mountain.name}</h4>
     <div className="tooltip-meta">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-        <MapPin size={12} /> {mountain.province}
-      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} /> {mountain.province}</div>
       <div>해발 {mountain.height}m</div>
-      {mountain.climb_date && mountain.climb_date !== 'null' ? (
-        <div className="badge" style={{ background: '#e8f7ed', color: 'var(--success)' }}>등반 완료</div>
-      ) : (
-        <div className="badge">미등정</div>
-      )}
     </div>
   </motion.div>
 );
@@ -452,91 +423,21 @@ const MapTooltip = ({ mountain, position }) => (
 const BottomSheet = ({ mountain, onClose }) => {
   const isCompleted = mountain.climb_date && mountain.climb_date !== 'null';
   if (!mountain) return null;
-
   const currentMonth = new Date().getMonth() + 1;
   const rec = (seasonalData[currentMonth] || []).find(r => mountain.name.includes(r.name));
-  
   return (
     <div className="overlay-backdrop" onClick={onClose}>
-      <motion.div 
-        className="bottom-sheet"
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        onClick={e => e.stopPropagation()}
-      >
+      <motion.div className="bottom-sheet" initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 200 }} onClick={e => e.stopPropagation()}>
         <div className="sheet-handle" />
-        <button onClick={onClose} style={{ position: 'absolute', right: '24px', top: '24px', background: 'var(--bg-page)', border: 'none', borderRadius: '50%', padding: '8px' }}>
-          <X size={20} />
-        </button>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          {rec && <span className="season-badge">추천 랭킹 {rec.rank}위</span>}
-          <span className="badge">{mountain.province}</span>
-        </div>
+        <button onClick={onClose} style={{ position: 'absolute', right: '24px', top: '24px', background: 'var(--bg-page)', border: 'none', borderRadius: '50%', padding: '8px' }}><X size={20} /></button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>{rec && <span className="season-badge">추천 랭킹 {rec.rank}위</span>} <span className="badge">{mountain.province}</span></div>
         <h2 className="sheet-title" style={{ marginBottom: '1.5rem' }}>{mountain.name}</h2>
-        
         <div className="sheet-content">
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <span className="badge" style={{ padding: '4px 12px' }}>해발 {mountain.height}m</span>
-            {isCompleted && <span className="badge" style={{ background: '#e8f7ed', color: 'var(--success)', padding: '4px 12px' }}>등반 완료</span>}
-          </div>
-
-          {rec && (
-            <div className="info-item" style={{ background: '#fff9db', padding: '1.2rem', borderRadius: '16px', border: '1px solid #ffe066' }}>
-              <Sparkles className="info-icon" size={24} color="#f08c00" />
-              <div className="info-text">
-                <h4 style={{ color: '#f08c00', fontSize: '0.9rem' }}>{new Date().getMonth() + 1}월 산행 테마</h4>
-                <p style={{ fontWeight: 700, fontSize: '1.1rem', marginTop: '4px' }}>{rec.reason}</p>
-              </div>
-            </div>
-          )}
-
-          <div className="info-item">
-            <Info className="info-icon" size={20} />
-            <div className="info-text">
-              <h4>명산 선정 사유</h4>
-              <p>{mountain.reason || '정보 없음'}</p>
-            </div>
-          </div>
-
-          {isCompleted && (
-            <div style={{ background: '#f8f9fa', padding: '1.2rem', borderRadius: '16px' }}>
-              <div className="info-item" style={{ marginBottom: '1rem' }}>
-                <Calendar className="info-icon" size={20} />
-                <div className="info-text">
-                  <h4>최근 등반일</h4>
-                  <p>{mountain.climb_date.split('T')[0]}</p>
-                </div>
-              </div>
-              <div className="info-item">
-                <Users className="info-icon" size={20} />
-                <div className="info-text">
-                  <h4>함께한 사람</h4>
-                  <p>{mountain.companions || '없음'}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <motion.button 
-            whileTap={{ scale: 0.95 }}
-            style={{
-              marginTop: '1rem',
-              padding: '1.2rem',
-              borderRadius: '20px',
-              border: 'none',
-              background: 'var(--primary)',
-              color: 'white',
-              fontWeight: 700,
-              fontSize: '1.1rem',
-              boxShadow: '0 8px 24px rgba(0, 122, 255, 0.25)'
-            }}
-            onClick={onClose}
-          >
-            확인
-          </motion.button>
+          <div style={{ display: 'flex', gap: '8px' }}><span className="badge" style={{ padding: '4px 12px' }}>해발 {mountain.height}m</span> {isCompleted && <span className="badge" style={{ background: '#e8f7ed', color: 'var(--success)', padding: '4px 12px' }}>등반 완료</span>}</div>
+          {rec && <div className="info-item" style={{ background: '#fff9db', padding: '1.2rem', borderRadius: '16px', border: '1px solid #ffe066' }}><Sparkles className="info-icon" size={24} color="#f08c00" /><div className="info-text"><h4 style={{ color: '#f08c00', fontSize: '0.9rem' }}>{new Date().getMonth() + 1}월 산행 테마</h4><p style={{ fontWeight: 700, fontSize: '1.1rem', marginTop: '4px' }}>{rec.reason}</p></div></div>}
+          <div className="info-item"><Info className="info-icon" size={20} /><div className="info-text"><h4>명산 선정 사유</h4><p>{mountain.reason || '정보 없음'}</p></div></div>
+          {isCompleted && <div style={{ background: '#f8f9fa', padding: '1.2rem', borderRadius: '16px' }}><div className="info-item" style={{ marginBottom: '1rem' }}><Calendar className="info-icon" size={20} /><div className="info-text"><h4>최근 등반일</h4><p>{mountain.climb_date.split('T')[0]}</p></div></div><div className="info-item"><Users className="info-icon" size={20} /><div className="info-text"><h4>함께한 사람</h4><p>{mountain.companions || '없음'}</p></div></div></div>}
+          <motion.button whileTap={{ scale: 0.95 }} style={{ marginTop: '1rem', padding: '1.2rem', borderRadius: '20px', border: 'none', background: 'var(--primary)', color: 'white', fontWeight: 700, fontSize: '1.1rem', boxShadow: '0 8px 24px rgba(0, 122, 255, 0.25)' }} onClick={onClose}>확인</motion.button>
         </div>
       </motion.div>
     </div>
