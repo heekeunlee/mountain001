@@ -16,7 +16,9 @@ import {
   X,
   ChevronRight,
   Info,
-  MapPin
+  MapPin,
+  Sparkles,
+  Flower2
 } from 'lucide-react';
 import {
   ComposableMap,
@@ -29,6 +31,22 @@ import './index.css';
 
 const geoUrl = "https://raw.githubusercontent.com/southkorea/southkorea-maps/master/kostat/2013/json/skorea_provinces_geo.json";
 
+// Seasonal Recommendation Data
+const seasonalData = {
+  1: { mountain: "태백산", reason: "환상적인 눈꽃 축제와 주목 군락지의 설경이 일품입니다." },
+  2: { mountain: "소백산", reason: "칼바람 속의 은빛 눈꽃 터널을 걷는 겨울 산행의 묘미가 있습니다." },
+  3: { mountain: "지리산", reason: "섬진강변 매화와 함께 시작되는 지리산의 봄 기운을 느껴보세요." },
+  4: { mountain: "황매산", reason: "4월 말부터 시작되는 진분홍빛 철쭉 군락지가 장관을 이룹니다." },
+  5: { mountain: "바래봉", reason: "지리산 바래봉의 철쭉은 국내 최고 수준의 절경을 자랑합니다." },
+  6: { mountain: "설악산", reason: "여름의 시작, 공룡능선의 웅장함과 시원한 계곡이 반겨줍니다." },
+  7: { mountain: "덕유산", reason: "무주 구천동 계곡의 시원한 물줄기와 푸른 숲이 여름 산행지로 제격입니다." },
+  8: { mountain: "한라산", reason: "여름 구름 위를 걷는 백록담 산행과 시원한 바다 전망이 아름답습니다." },
+  9: { mountain: "오대산", reason: "국내에서 가장 먼저 단풍이 시작되는 곳으로 가을의 시작을 알립니다." },
+  10: { mountain: "내장산", reason: "아기단풍이 빚어내는 화려한 가을 색채의 향연을 만끽할 수 있습니다." },
+  11: { mountain: "민둥산", reason: "억새 꽃이 피어나는 은빛 물결의 능선이 가을 감성을 자극합니다." },
+  12: { mountain: "마니산", reason: "한 해를 마무리하며 강화도 앞바다의 낙조를 감상하기 가장 좋은 곳입니다." }
+};
+
 const App = () => {
   const [activeTab, setActiveTab] = useState('home'); 
   const [selectedMountain, setSelectedMountain] = useState(null);
@@ -38,6 +56,9 @@ const App = () => {
 
   const mountains = hikingData.mountains || [];
   const logs = hikingData.logs || [];
+
+  const currentMonth = new Date().getMonth() + 1;
+  const recommendation = seasonalData[currentMonth];
 
   const stats = useMemo(() => {
     const completed = mountains.filter(m => m.climb_date && m.climb_date !== 'null').length;
@@ -86,6 +107,9 @@ const App = () => {
             onSelect={setSelectedMountain} 
           />
         )}
+        {activeTab === 'recommend' && (
+          <RecommendSection key="recommend" recommendation={recommendation} mountains={mountains} onSelect={setSelectedMountain} />
+        )}
       </AnimatePresence>
 
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -116,23 +140,30 @@ const BottomNav = ({ activeTab, setActiveTab }) => (
     <NavItem 
       id="home" 
       label="홈" 
-      icon={<Home size={20} />} 
+      icon={<Home size={18} />} 
       isActive={activeTab === 'home'} 
       onClick={() => setActiveTab('home')} 
     />
     <NavItem 
       id="map" 
       label="지도" 
-      icon={<MapIcon size={20} />} 
+      icon={<MapIcon size={18} />} 
       isActive={activeTab === 'map'} 
       onClick={() => setActiveTab('map')} 
     />
     <NavItem 
       id="list" 
       label="목록" 
-      icon={<List size={20} />} 
+      icon={<List size={18} />} 
       isActive={activeTab === 'list'} 
       onClick={() => setActiveTab('list')} 
+    />
+    <NavItem 
+      id="recommend" 
+      label="추천" 
+      icon={<Sparkles size={18} />} 
+      isActive={activeTab === 'recommend'} 
+      onClick={() => setActiveTab('recommend')} 
     />
   </nav>
 );
@@ -200,9 +231,9 @@ const HomeSection = ({ stats, recentLogs }) => (
 
 const MapSection = ({ mountains, onSelect, onHover }) => (
   <motion.div 
-    initial={{ opacity: 0, scale: 0.95 }}
-    animate={{ opacity: 1, scale: 1 }}
-    exit={{ opacity: 0, scale: 1.05 }}
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
     className="map-page"
   >
     <div className="map-full-container">
@@ -218,12 +249,12 @@ const MapSection = ({ mountains, onSelect, onHover }) => (
                 <Geography
                   key={geo.rsmKey}
                   geography={geo}
-                  fill="#fdfdfd"
-                  stroke="#efeff4"
-                  strokeWidth={0.5}
+                  fill="#ffffff"
+                  stroke="#adb5bd" // More vivid border
+                  strokeWidth={0.8}
                   style={{ 
                     default: { outline: "none" }, 
-                    hover: { fill: "#f2f2f7", outline: "none" } 
+                    hover: { fill: "#e9ecef", outline: "none" } 
                   }}
                 />
               ))
@@ -241,16 +272,11 @@ const MapSection = ({ mountains, onSelect, onHover }) => (
                 onMouseEnter={() => onHover(m)}
                 onMouseLeave={() => onHover(null)}
               >
-                <motion.g 
-                  initial={{ scale: 0 }} 
-                  animate={{ scale: 1 }} 
-                  whileHover={{ scale: 1.5 }}
-                  className="marker"
-                >
+                <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }} whileHover={{ scale: 1.5 }} className="marker">
                   {isCompleted ? (
                     <Flag size={14} className="marker-flag" style={{ transform: 'translate(-7px, -14px)' }} />
                   ) : (
-                    <circle r={3} className="marker-dot" style={{ fill: '#d1d1d6', opacity: 0.6 }} />
+                    <circle r={2.5} className="marker-dot" style={{ fill: '#495057', opacity: 0.5 }} />
                   )}
                 </motion.g>
               </Marker>
@@ -261,6 +287,50 @@ const MapSection = ({ mountains, onSelect, onHover }) => (
     </div>
   </motion.div>
 );
+
+const RecommendSection = ({ recommendation, mountains, onSelect }) => {
+  const mountainDetail = mountains.find(m => m.name.includes(recommendation.mountain));
+  
+  return (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 1.1 }}
+      className="content-section"
+    >
+      <header className="recommend-header">
+        <span className="season-badge">{new Date().getMonth() + 1}월 추천 테마</span>
+        <h2>지금 가기 좋은 명산 ⛰️</h2>
+      </header>
+
+      <div className="recommend-card">
+        <div className="mountain-icon" style={{ width: '64px', height: '64px', margin: '0 auto 1.5rem', background: 'var(--primary-bg)' }}>
+          <Flower2 size={32} />
+        </div>
+        <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{recommendation.mountain}</h3>
+        <p style={{ color: 'var(--text-secondary)' }}>{mountainDetail?.province} • {mountainDetail?.height}m</p>
+        
+        <div className="recommend-reason">
+          <p style={{ fontWeight: 600, fontSize: '1.1rem', color: 'var(--text-main)' }}>
+            "{recommendation.reason}"
+          </p>
+        </div>
+
+        <button 
+          className="card" 
+          style={{ width: '100%', marginTop: '2rem', border: 'none', background: 'var(--primary)', color: 'white', fontWeight: 700 }}
+          onClick={() => onSelect(mountainDetail)}
+        >
+          상세 정보 보기
+        </button>
+      </div>
+      
+      <div style={{ marginTop: '2rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+        <p>※ 추천 산행지는 계절별 특징과 축제 일정을 고려하여 매달 자동으로 업데이트됩니다.</p>
+      </div>
+    </motion.div>
+  );
+};
 
 const ListSection = ({ mountains, searchTerm, setSearchTerm, onSelect }) => (
   <motion.div 
@@ -328,6 +398,7 @@ const MapTooltip = ({ mountain, position }) => (
 
 const BottomSheet = ({ mountain, onClose }) => {
   const isCompleted = mountain.climb_date && mountain.climb_date !== 'null';
+  if (!mountain) return null;
   
   return (
     <div className="overlay-backdrop" onClick={onClose}>
