@@ -125,8 +125,6 @@ const App = () => {
     sorted.forEach(log => {
       const lastGroup = groups[groups.length - 1];
       const mountain = mountains.find(m => (m.name || "").includes(log.location));
-      
-      // In this specific dataset, 'distance' field often contains names and 'time' field often contains actual distance
       const rawCompanions = log.distance && typeof log.distance === 'string' ? log.distance : '';
       
       if (lastGroup && lastGroup.location === log.location) {
@@ -350,6 +348,34 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
                     ) : (
                       <circle r={3.5} fill="#636366" opacity={0.8} />
                     )}
+                    
+                    {/* Add Map Labels - Visible Always but Small */}
+                    <text
+                      textAnchor="middle"
+                      y={-22}
+                      style={{
+                        fontFamily: "var(--font-main)",
+                        fontSize: "6px",
+                        fontWeight: 700,
+                        fill: isCompleted ? "var(--primary)" : "#636366",
+                        pointerEvents: "none",
+                        letterSpacing: "-0.5px"
+                      }}
+                    >
+                      {m.name}
+                    </text>
+                    <text
+                      textAnchor="middle"
+                      y={-30}
+                      style={{
+                        fontFamily: "var(--font-main)",
+                        fontSize: "5px",
+                        fill: "#86868b",
+                        pointerEvents: "none"
+                      }}
+                    >
+                      {m.height}m | {m.province}
+                    </text>
                   </motion.g>
                 </Marker>
               );
