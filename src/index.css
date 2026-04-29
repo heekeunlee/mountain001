@@ -144,6 +144,7 @@ body {
   height: calc(100vh - var(--nav-height));
   display: flex;
   flex-direction: column;
+  padding: 0; /* Remove padding for full-screen effect */
 }
 
 .map-full-container {
@@ -154,6 +155,8 @@ body {
   justify-content: center;
   align-items: center;
   overflow: hidden;
+  border-radius: 0; /* Edge to edge */
+  box-shadow: none;
 }
 
 .map-svg-container {

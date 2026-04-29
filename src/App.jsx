@@ -32,7 +32,7 @@ import './index.css';
 
 const geoUrl = "https://raw.githubusercontent.com/southkorea/southkorea-maps/master/kostat/2013/json/skorea_provinces_geo.json";
 
-// Detailed Seasonal Recommendations (Top 5-10 per month)
+// Detailed Seasonal Recommendations
 const seasonalData = {
   1: [
     { name: "태백산", reason: "환상적인 눈꽃 축제와 천년의 주목 군락지가 빚어내는 설경이 압권입니다.", rank: 1 },
@@ -129,7 +129,7 @@ const App = () => {
     <div className="app-container" onMouseMove={handleMouseMove}>
       <AnimatePresence mode="wait">
         {activeTab === 'home' && (
-          <HomeSection key="home" stats={stats} recentLogs={logs.slice(0, 5)} onSelect={setSelectedMountain} mountains={mountains} />
+          <HomeSection key="home" stats={stats} recentLogs={logs.slice(0, 5)} onSelect={setSelectedMountain} />
         )}
         {activeTab === 'map' && (
           <MapSection 
@@ -224,7 +224,7 @@ const NavItem = ({ label, icon, isActive, onClick }) => (
   </button>
 );
 
-const HomeSection = ({ stats, recentLogs, onSelect, mountains }) => (
+const HomeSection = ({ stats, recentLogs }) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -296,7 +296,7 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
         <div className="map-svg-container">
           <ComposableMap
             projection="geoMercator"
-            projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: 7500 }} // Increased scale for more zoom
+            projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: 8500 }} // Increased scale for full-screen fit
             style={{ width: "100%", height: "100%" }}
           >
             <Geographies geography={geoUrl}>
@@ -306,11 +306,11 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
                     key={geo.rsmKey}
                     geography={geo}
                     fill="#ffffff"
-                    stroke="#86868b" 
-                    strokeWidth={0.5}
+                    stroke="#adb5bd" 
+                    strokeWidth={0.6}
                     style={{ 
                       default: { outline: "none" }, 
-                      hover: { fill: "#f2f2f7", outline: "none" } 
+                      hover: { fill: "#f8f9fa", outline: "none" } 
                     }}
                   />
                 ))
@@ -332,11 +332,11 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
                 >
                   <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }} whileHover={{ scale: 1.5 }} className="marker">
                     {isRecommended ? (
-                      <Flag size={16} fill="#ffcc00" stroke="#000" strokeWidth={0.5} style={{ transform: 'translate(-8px, -16px)' }} />
+                      <Flag size={18} fill="#ffcc00" stroke="#000" strokeWidth={0.5} style={{ transform: 'translate(-9px, -18px)' }} />
                     ) : isCompleted ? (
-                      <Flag size={14} className="marker-flag" style={{ transform: 'translate(-7px, -14px)' }} />
+                      <Flag size={16} className="marker-flag" style={{ transform: 'translate(-8px, -16px)' }} />
                     ) : (
-                      <circle r={2.5} fill="#adb5bd" opacity={0.6} />
+                      <circle r={3.5} fill="#636366" opacity={0.8} /> // Larger and darker dots
                     )}
                   </motion.g>
                 </Marker>
@@ -349,43 +349,41 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
   );
 };
 
-const RecommendSection = ({ recommendations, mountains, onSelect }) => {
-  return (
-    <motion.div 
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="content-section"
-    >
-      <header className="recommend-header">
-        <span className="season-badge">{new Date().getMonth() + 1}월 추천 산행지 Top {recommendations.length}</span>
-        <h2>지금 꼭 가봐야 할 명산 🏆</h2>
-      </header>
+const RecommendSection = ({ recommendations, mountains, onSelect }) => (
+  <motion.div 
+    initial={{ opacity: 0, x: 20 }}
+    animate={{ opacity: 1, x: 0 }}
+    exit={{ opacity: 0, x: -20 }}
+    className="content-section"
+  >
+    <header className="recommend-header">
+      <span className="season-badge">{new Date().getMonth() + 1}월 추천 산행지 Top {recommendations.length}</span>
+      <h2>지금 꼭 가봐야 할 명산 🏆</h2>
+    </header>
 
-      {recommendations.map((rec, i) => {
-        const detail = mountains.find(m => m.name.includes(rec.name));
-        return (
-          <div key={i} className="card" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', cursor: 'pointer' }} onClick={() => onSelect(detail)}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: i === 0 ? '#ffcc00' : '#f2f2f7', display: 'flex', alignItems: 'center', justifyCenter: 'center', color: i === 0 ? 'white' : 'var(--text-secondary)', fontWeight: 700 }}>
-              {rec.rank}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{rec.name}</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                {rec.reason.substring(0, 40)}...
-              </div>
-            </div>
-            <ChevronRight size={18} color="var(--border)" />
+    {recommendations.map((rec, i) => {
+      const detail = mountains.find(m => m.name.includes(rec.name));
+      return (
+        <div key={i} className="card" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', cursor: 'pointer' }} onClick={() => onSelect(detail)}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: i === 0 ? '#ffcc00' : '#f2f2f7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: i === 0 ? 'white' : 'var(--text-secondary)', fontWeight: 700 }}>
+            {rec.rank}
           </div>
-        );
-      })}
-      
-      <div style={{ marginTop: '2rem', padding: '1rem', background: 'var(--primary-bg)', borderRadius: '12px', fontSize: '0.85rem', color: 'var(--primary)' }}>
-        <p>※ 추천 산행지는 계절별 특성(개화 시기, 단풍, 설경 등)을 고려하여 랭킹순으로 제공됩니다.</p>
-      </div>
-    </motion.div>
-  );
-};
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{rec.name}</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              {rec.reason.substring(0, 40)}...
+            </div>
+          </div>
+          <ChevronRight size={18} color="var(--border)" />
+        </div>
+      );
+    })}
+    
+    <div style={{ marginTop: '2rem', padding: '1rem', background: 'var(--primary-bg)', borderRadius: '12px', fontSize: '0.85rem', color: 'var(--primary)' }}>
+      <p>※ 추천 산행지는 계절별 특성(개화 시기, 단풍, 설경 등)을 고려하여 랭킹순으로 제공됩니다.</p>
+    </div>
+  </motion.div>
+);
 
 const ListSection = ({ mountains, searchTerm, setSearchTerm, onSelect }) => (
   <motion.div 
@@ -455,7 +453,6 @@ const BottomSheet = ({ mountain, onClose }) => {
   const isCompleted = mountain.climb_date && mountain.climb_date !== 'null';
   if (!mountain) return null;
 
-  // Find if this mountain is in the seasonal recommendation
   const currentMonth = new Date().getMonth() + 1;
   const rec = (seasonalData[currentMonth] || []).find(r => mountain.name.includes(r.name));
   
@@ -487,11 +484,11 @@ const BottomSheet = ({ mountain, onClose }) => {
           </div>
 
           {rec && (
-            <div className="info-item" style={{ background: '#fff9db', padding: '1rem', borderRadius: '12px', border: '1px solid #ffe066' }}>
-              <Sparkles className="info-icon" size={20} color="#f08c00" />
+            <div className="info-item" style={{ background: '#fff9db', padding: '1.2rem', borderRadius: '16px', border: '1px solid #ffe066' }}>
+              <Sparkles className="info-icon" size={24} color="#f08c00" />
               <div className="info-text">
-                <h4 style={{ color: '#f08c00' }}>{new Date().getMonth() + 1}월 추천 테마</h4>
-                <p style={{ fontWeight: 600 }}>{rec.reason}</p>
+                <h4 style={{ color: '#f08c00', fontSize: '0.9rem' }}>{new Date().getMonth() + 1}월 산행 테마</h4>
+                <p style={{ fontWeight: 700, fontSize: '1.1rem', marginTop: '4px' }}>{rec.reason}</p>
               </div>
             </div>
           )}
@@ -499,13 +496,13 @@ const BottomSheet = ({ mountain, onClose }) => {
           <div className="info-item">
             <Info className="info-icon" size={20} />
             <div className="info-text">
-              <h4>상세 정보 (선정 사유)</h4>
+              <h4>명산 선정 사유</h4>
               <p>{mountain.reason || '정보 없음'}</p>
             </div>
           </div>
 
           {isCompleted && (
-            <div style={{ background: '#f8f9fa', padding: '1rem', borderRadius: '16px' }}>
+            <div style={{ background: '#f8f9fa', padding: '1.2rem', borderRadius: '16px' }}>
               <div className="info-item" style={{ marginBottom: '1rem' }}>
                 <Calendar className="info-icon" size={20} />
                 <div className="info-text">
@@ -534,7 +531,7 @@ const BottomSheet = ({ mountain, onClose }) => {
               color: 'white',
               fontWeight: 700,
               fontSize: '1.1rem',
-              boxShadow: '0 8px 16px rgba(0, 122, 255, 0.2)'
+              boxShadow: '0 8px 24px rgba(0, 122, 255, 0.25)'
             }}
             onClick={onClose}
           >
