@@ -21,7 +21,10 @@ import {
   Flower2,
   Award,
   ArrowUpCircle,
-  Clock
+  Clock,
+  Plus,
+  Minus,
+  Type
 } from 'lucide-react';
 import {
   ComposableMap,
@@ -96,6 +99,10 @@ const App = () => {
   const [hoveredMountain, setHoveredMountain] = useState(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Map Zoom State
+  const [zoom, setZoom] = useState(1);
+  const [showLabels, setShowLabels] = useState(true);
 
   const mountains = hikingData.mountains || [];
   const logs = hikingData.logs || [];
@@ -118,20 +125,13 @@ const App = () => {
 
   const groupedLogs = useMemo(() => {
     if (!logs.length) return [];
-    
     const sorted = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
     const groups = [];
-    
     sorted.forEach(log => {
       const lastGroup = groups[groups.length - 1];
       const mountain = mountains.find(m => (m.name || "").includes(log.location));
-      const rawCompanions = log.distance && typeof log.distance === 'string' ? log.distance : '';
-      
       if (lastGroup && lastGroup.location === log.location) {
-        const lastDate = new Date(lastGroup.date);
-        const currDate = new Date(log.date);
-        const diffDays = Math.abs(lastDate - currDate) / (1000 * 60 * 60 * 24);
-        
+        const diffDays = Math.abs(new Date(lastGroup.date) - new Date(log.date)) / (1000 * 60 * 60 * 24);
         if (diffDays <= 2) {
           lastGroup.isMerged = true;
           lastGroup.endDate = lastGroup.endDate || lastGroup.date;
@@ -139,22 +139,10 @@ const App = () => {
           return;
         }
       }
-      groups.push({ 
-        ...log, 
-        companionsOverride: rawCompanions,
-        mountainInfo: mountain 
-      });
+      groups.push({ ...log, companionsOverride: log.distance, mountainInfo: mountain });
     });
-    
     return groups;
   }, [logs, mountains]);
-
-  const filteredMountains = useMemo(() => {
-    return mountains.filter(m => 
-      (m.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
-      (m.province || "").toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [mountains, searchTerm]);
 
   const handleMouseMove = (e) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
@@ -173,12 +161,16 @@ const App = () => {
             onSelect={setSelectedMountain} 
             onHover={setHoveredMountain}
             recommendations={recommendations}
+            zoom={zoom}
+            setZoom={setZoom}
+            showLabels={showLabels}
+            setShowLabels={setShowLabels}
           />
         )}
         {activeTab === 'list' && (
           <ListSection 
             key="list" 
-            mountains={filteredMountains} 
+            mountains={mountains.filter(m => (m.name || "").toLowerCase().includes(searchTerm.toLowerCase()))} 
             searchTerm={searchTerm} 
             setSearchTerm={setSearchTerm}
             onSelect={setSelectedMountain} 
@@ -197,21 +189,11 @@ const App = () => {
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <AnimatePresence>
-        {selectedMountain && (
-          <BottomSheet 
-            mountain={selectedMountain} 
-            onClose={() => setSelectedMountain(null)} 
-          />
-        )}
+        {selectedMountain && <BottomSheet mountain={selectedMountain} onClose={() => setSelectedMountain(null)} />}
       </AnimatePresence>
 
       <AnimatePresence>
-        {hoveredMountain && (
-          <MapTooltip 
-            mountain={hoveredMountain} 
-            position={mousePosition} 
-          />
-        )}
+        {hoveredMountain && <MapTooltip mountain={hoveredMountain} position={mousePosition} />}
       </AnimatePresence>
     </div>
   );
@@ -228,86 +210,55 @@ const BottomNav = ({ activeTab, setActiveTab }) => (
 
 const NavItem = ({ label, icon, isActive, onClick }) => (
   <button className={`nav-item ${isActive ? 'active' : ''}`} onClick={onClick}>
-    <div className="nav-icon-container">
-      {icon}
-    </div>
+    <div className="nav-icon-container">{icon}</div>
     <span>{label}</span>
   </button>
 );
 
 const HomeSection = ({ stats, recentLogs, onSelect }) => (
-  <motion.div 
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    exit={{ opacity: 0, y: -20 }}
-    className="content-section"
-  >
-    <header className="home-header">
-      <h1>전국의 100대 명산 챌린지</h1>
-    </header>
-
+  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="content-section">
+    <header className="home-header"><h1>전국의 100대 명산 챌린지</h1></header>
     <div className="card">
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1rem' }}>
         <h3 style={{ fontSize: '1rem' }}>전체 달성률</h3>
         <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '1.2rem' }}>{stats.percent}%</span>
       </div>
       <div className="progress-container">
-        <motion.div 
-          className="progress-bar" 
-          initial={{ width: 0 }}
-          animate={{ width: `${stats.percent}%` }}
-        />
+        <motion.div className="progress-bar" initial={{ width: 0 }} animate={{ width: `${stats.percent}%` }} />
       </div>
       <div className="stat-grid" style={{ marginTop: '1.5rem' }}>
-        <div className="stat-item">
-          <span className="stat-label">현재 완료</span>
-          <div className="stat-value">
-            {stats.completed}<span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 400 }}> / {stats.total}</span>
-          </div>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">남은 도전</span>
-          <div className="stat-value" style={{ color: 'var(--primary)' }}>
-            {stats.remaining}<span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 400 }}> 곳</span>
-          </div>
-        </div>
+        <div className="stat-item"><span className="stat-label">현재 완료</span><div className="stat-value">{stats.completed}<span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 400 }}> / {stats.total}</span></div></div>
+        <div className="stat-item"><span className="stat-label">남은 도전</span><div className="stat-value" style={{ color: 'var(--primary)' }}>{stats.remaining}<span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 400 }}> 곳</span></div></div>
       </div>
     </div>
-
     <h3 style={{ margin: '1.5rem 0 1rem' }}>최근 등반 기록</h3>
-    {recentLogs.length > 0 ? recentLogs.map((log, i) => {
+    {recentLogs.map((log, i) => {
       const compStr = log.companionsOverride || "";
       const companionList = compStr ? compStr.split('/').map(name => `+${name.trim()}`).join(' ') : '';
-        
       return (
         <div key={i} className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center', cursor: 'pointer' }} onClick={() => log.mountainInfo && onSelect(log.mountainInfo)}>
-          <div className="mountain-icon" style={{ borderRadius: '12px' }}>
-            <Calendar size={18} />
-          </div>
+          <div className="mountain-icon" style={{ borderRadius: '12px' }}><Calendar size={18} /></div>
           <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{log.location}</div>
-              <span className="badge" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>{log.mountainInfo?.province}</span>
-            </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              {log.isMerged ? `${log.date.split('T')[0]} ~ ${log.endDate.split('T')[0]}` : log.date.split('T')[0]}
-            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{log.location}</div><span className="badge" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>{log.mountainInfo?.province}</span></div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>{log.isMerged ? `${log.date.split('T')[0]} ~ ${log.endDate.split('T')[0]}` : log.date.split('T')[0]}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600, marginBottom: '2px' }}>{companionList}</div>
-            <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>{log.mountainInfo?.height}m</div>
+            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{log.mountainInfo?.height}m</div>
             <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>해발 고도</div>
           </div>
         </div>
       );
-    }) : (
-      <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>기록된 등반이 없습니다.</p>
-    )}
+    })}
   </motion.div>
 );
 
-const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
+const MapSection = ({ mountains, onSelect, onHover, recommendations, zoom, setZoom, showLabels, setShowLabels }) => {
   const recommendNames = recommendations.map(r => r.name);
+  const baseScale = 9500;
+  
+  const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.5, 4));
+  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.5, 1));
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="map-page">
@@ -315,7 +266,7 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
         <div className="map-svg-container">
           <ComposableMap
             projection="geoMercator"
-            projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: 9500 }}
+            projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: baseScale * zoom }}
             style={{ width: "100%", height: "100%" }}
           >
             <Geographies geography={geoUrl}>
@@ -326,7 +277,7 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
                     geography={geo}
                     fill="#ffffff"
                     stroke="#adb5bd" 
-                    strokeWidth={0.6}
+                    strokeWidth={0.6 / zoom}
                     style={{ default: { outline: "none" }, hover: { fill: "#f8f9fa", outline: "none" } }}
                   />
                 ))
@@ -338,44 +289,54 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
               const isRecommended = recommendNames.some(name => (m.name || "").includes(name));
               if (!m.lng || !m.lat) return null;
               
+              // Alternating offset to reduce overlap
+              const xOffset = (idx % 2 === 0 ? 5 : -5);
+              const yOffset = (idx % 3 === 0 ? -25 : -15);
+
               return (
                 <Marker key={idx} coordinates={[m.lng, m.lat]} onClick={() => onSelect(m)} onMouseEnter={() => onHover(m)} onMouseLeave={() => onHover(null)}>
-                  <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }} whileHover={{ scale: 1.5 }} className="marker">
+                  <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }} className="marker">
                     {isRecommended ? (
-                      <Flag size={18} fill="#ffcc00" stroke="#000" strokeWidth={0.5} style={{ transform: 'translate(-9px, -18px)' }} />
+                      <Flag size={18 / Math.sqrt(zoom)} fill="#ffcc00" stroke="#000" strokeWidth={0.5} style={{ transform: `translate(-${9/zoom}px, -${18/zoom}px)` }} />
                     ) : isCompleted ? (
-                      <Flag size={16} fill="var(--primary)" stroke="#fff" strokeWidth={0.5} style={{ transform: 'translate(-8px, -16px)' }} />
+                      <Flag size={16 / Math.sqrt(zoom)} fill="var(--primary)" stroke="#fff" strokeWidth={0.5} style={{ transform: `translate(-${8/zoom}px, -${16/zoom}px)` }} />
                     ) : (
-                      <circle r={3.5} fill="#636366" opacity={0.8} />
+                      <circle r={3.5 / Math.sqrt(zoom)} fill="#636366" opacity={0.8} />
                     )}
                     
-                    {/* Add Map Labels - Visible Always but Small */}
-                    <text
-                      textAnchor="middle"
-                      y={-22}
-                      style={{
-                        fontFamily: "var(--font-main)",
-                        fontSize: "6px",
-                        fontWeight: 700,
-                        fill: isCompleted ? "var(--primary)" : "#636366",
-                        pointerEvents: "none",
-                        letterSpacing: "-0.5px"
-                      }}
-                    >
-                      {m.name}
-                    </text>
-                    <text
-                      textAnchor="middle"
-                      y={-30}
-                      style={{
-                        fontFamily: "var(--font-main)",
-                        fontSize: "5px",
-                        fill: "#86868b",
-                        pointerEvents: "none"
-                      }}
-                    >
-                      {m.height}m | {m.province}
-                    </text>
+                    {showLabels && (
+                      <motion.g initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <text
+                          textAnchor={idx % 2 === 0 ? "start" : "end"}
+                          x={xOffset}
+                          y={yOffset}
+                          style={{
+                            fontFamily: "var(--font-main)",
+                            fontSize: `${Math.max(4, 6 / Math.sqrt(zoom))}px`,
+                            fontWeight: 700,
+                            fill: isCompleted ? "var(--primary)" : "#636366",
+                            pointerEvents: "none"
+                          }}
+                        >
+                          {m.name}
+                        </text>
+                        {zoom > 1.5 && (
+                          <text
+                            textAnchor={idx % 2 === 0 ? "start" : "end"}
+                            x={xOffset}
+                            y={yOffset - 6}
+                            style={{
+                              fontFamily: "var(--font-main)",
+                              fontSize: "4px",
+                              fill: "#86868b",
+                              pointerEvents: "none"
+                            }}
+                          >
+                            {m.height}m
+                          </text>
+                        )}
+                      </motion.g>
+                    )}
                   </motion.g>
                 </Marker>
               );
@@ -383,16 +344,17 @@ const MapSection = ({ mountains, onSelect, onHover, recommendations }) => {
           </ComposableMap>
         </div>
 
+        {/* Map Controls */}
+        <div style={{ position: 'absolute', top: '20px', right: '20px', display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 100 }}>
+          <button className="card" style={{ padding: '12px', border: 'none', background: 'white', borderRadius: '50%' }} onClick={handleZoomIn}><Plus size={20} /></button>
+          <button className="card" style={{ padding: '12px', border: 'none', background: 'white', borderRadius: '50%' }} onClick={handleZoomOut}><Minus size={20} /></button>
+          <button className="card" style={{ padding: '12px', border: 'none', background: showLabels ? 'var(--primary-bg)' : 'white', borderRadius: '50%', color: showLabels ? 'var(--primary)' : 'inherit' }} onClick={() => setShowLabels(!showLabels)}><Type size={20} /></button>
+        </div>
+
         <div className="map-legend" style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(255,255,255,0.9)', padding: '12px', borderRadius: '12px', boxShadow: 'var(--shadow)', fontSize: '0.75rem', zIndex: 100 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <Flag size={12} fill="var(--primary)" /> <span>등반 완료</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <Flag size={12} fill="#ffcc00" /> <span>이달의 추천</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#636366' }}></div> <span>미답지</span>
-          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}><Flag size={12} fill="var(--primary)" /> <span>등반 완료</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}><Flag size={12} fill="#ffcc00" /> <span>이달의 추천</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#636366' }}></div> <span>미답지</span></div>
         </div>
       </div>
     </motion.div>
@@ -405,37 +367,26 @@ const RecommendSection = ({ recommendations, mountains, onSelect }) => (
       <span className="season-badge">{new Date().getMonth() + 1}월 추천 산행지 Top {recommendations.length}</span>
       <h2>지금 꼭 가봐야 할 명산 🏆</h2>
     </header>
-    {recommendations.map((rec, i) => {
-      const detail = mountains.find(m => m.name.includes(rec.name));
-      return (
-        <div key={i} className="card" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', cursor: 'pointer' }} onClick={() => onSelect(detail)}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: i === 0 ? '#ffcc00' : '#f2f2f7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: i === 0 ? 'white' : 'var(--text-secondary)', fontWeight: 700 }}>{rec.rank}</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{rec.name}</div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{rec.reason.substring(0, 40)}...</div>
-          </div>
-          <ChevronRight size={18} color="var(--border)" />
+    {recommendations.map((rec, i) => (
+      <div key={i} className="card" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', cursor: 'pointer' }} onClick={() => onSelect(mountains.find(m => m.name.includes(rec.name)))}>
+        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: i === 0 ? '#ffcc00' : '#f2f2f7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: i === 0 ? 'white' : 'var(--text-secondary)', fontWeight: 700 }}>{rec.rank}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{rec.name}</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{rec.reason.substring(0, 40)}...</div>
         </div>
-      );
-    })}
+        <ChevronRight size={18} color="var(--border)" />
+      </div>
+    ))}
   </motion.div>
 );
 
 const ListSection = ({ mountains, searchTerm, setSearchTerm, onSelect }) => (
   <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="content-section">
-    <div className="list-header">
-      <div style={{ position: 'relative' }}>
-        <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-        <input className="search-input" placeholder="산 이름 검색" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-      </div>
-    </div>
+    <div className="list-header"><div style={{ position: 'relative' }}><Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} /><input className="search-input" placeholder="산 이름 검색" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div></div>
     {mountains.map((m, i) => (
       <div key={i} className={`mountain-row ${m.climb_date && m.climb_date !== 'null' ? 'completed' : ''}`} onClick={() => onSelect(m)}>
         <div className="mountain-icon">{m.climb_date && m.climb_date !== 'null' ? <Trophy size={18} /> : <MountainIcon size={18} />}</div>
-        <div className="mountain-row-info">
-          <div className="mountain-row-name">{m.name}</div>
-          <div className="mountain-row-meta">{m.province} • {m.height}m</div>
-        </div>
+        <div className="mountain-row-info"><div className="mountain-row-name">{m.name}</div><div className="mountain-row-meta">{m.province} • {m.height}m</div></div>
         <ChevronRight size={18} color="var(--border)" />
       </div>
     ))}
@@ -444,11 +395,7 @@ const ListSection = ({ mountains, searchTerm, setSearchTerm, onSelect }) => (
 
 const MapTooltip = ({ mountain, position }) => (
   <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="map-tooltip" style={{ left: position.x + 20, top: position.y - 60 }}>
-    <h4>{mountain.name}</h4>
-    <div className="tooltip-meta">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} /> {mountain.province}</div>
-      <div>해발 {mountain.height}m</div>
-    </div>
+    <h4>{mountain.name}</h4><div className="tooltip-meta"><div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} /> {mountain.province}</div><div>해발 {mountain.height}m</div></div>
   </motion.div>
 );
 
@@ -460,8 +407,7 @@ const BottomSheet = ({ mountain, onClose }) => {
   return (
     <div className="overlay-backdrop" onClick={onClose}>
       <motion.div className="bottom-sheet" initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 200 }} onClick={e => e.stopPropagation()}>
-        <div className="sheet-handle" />
-        <button onClick={onClose} style={{ position: 'absolute', right: '24px', top: '24px', background: 'var(--bg-page)', border: 'none', borderRadius: '50%', padding: '8px' }}><X size={20} /></button>
+        <div className="sheet-handle" /><button onClick={onClose} style={{ position: 'absolute', right: '24px', top: '24px', background: 'var(--bg-page)', border: 'none', borderRadius: '50%', padding: '8px' }}><X size={20} /></button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>{rec && <span className="season-badge">추천 랭킹 {rec.rank}위</span>} <span className="badge">{mountain.province}</span></div>
         <h2 className="sheet-title" style={{ marginBottom: '1.5rem' }}>{mountain.name}</h2>
         <div className="sheet-content">
