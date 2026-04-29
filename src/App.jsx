@@ -15,7 +15,8 @@ import {
   Flag,
   X,
   ChevronRight,
-  Info
+  Info,
+  MapPin
 } from 'lucide-react';
 import {
   ComposableMap,
@@ -31,6 +32,8 @@ const geoUrl = "https://raw.githubusercontent.com/southkorea/southkorea-maps/mas
 const App = () => {
   const [activeTab, setActiveTab] = useState('home'); 
   const [selectedMountain, setSelectedMountain] = useState(null);
+  const [hoveredMountain, setHoveredMountain] = useState(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [searchTerm, setSearchTerm] = useState('');
 
   const mountains = hikingData.mountains || [];
@@ -56,14 +59,23 @@ const App = () => {
     );
   }, [mountains, searchTerm]);
 
+  const handleMouseMove = (e) => {
+    setMousePosition({ x: e.clientX, y: e.clientY });
+  };
+
   return (
-    <div className="app-container">
+    <div className="app-container" onMouseMove={handleMouseMove}>
       <AnimatePresence mode="wait">
         {activeTab === 'home' && (
           <HomeSection key="home" stats={stats} recentLogs={logs.slice(0, 3)} />
         )}
         {activeTab === 'map' && (
-          <MapSection key="map" mountains={mountains} onSelect={setSelectedMountain} />
+          <MapSection 
+            key="map" 
+            mountains={mountains} 
+            onSelect={setSelectedMountain} 
+            onHover={setHoveredMountain}
+          />
         )}
         {activeTab === 'list' && (
           <ListSection 
@@ -83,6 +95,15 @@ const App = () => {
           <BottomSheet 
             mountain={selectedMountain} 
             onClose={() => setSelectedMountain(null)} 
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {hoveredMountain && (
+          <MapTooltip 
+            mountain={hoveredMountain} 
+            position={mousePosition} 
           />
         )}
       </AnimatePresence>
@@ -177,50 +198,66 @@ const HomeSection = ({ stats, recentLogs }) => (
   </motion.div>
 );
 
-const MapSection = ({ mountains, onSelect }) => (
+const MapSection = ({ mountains, onSelect, onHover }) => (
   <motion.div 
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
+    initial={{ opacity: 0, scale: 0.95 }}
+    animate={{ opacity: 1, scale: 1 }}
+    exit={{ opacity: 0, scale: 1.05 }}
     className="map-page"
   >
     <div className="map-full-container">
-      <ComposableMap
-        projection="geoMercator"
-        projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: 6000 }}
-        style={{ width: "100%", height: "100%" }}
-      >
-        <Geographies geography={geoUrl}>
-          {({ geographies }) =>
-            geographies.map((geo) => (
-              <Geography
-                key={geo.rsmKey}
-                geography={geo}
-                fill="#f8f9fa"
-                stroke="#e5e5ea"
-                strokeWidth={0.5}
-                style={{ default: { outline: "none" }, hover: { fill: "#f2f2f7", outline: "none" } }}
-              />
-            ))
-          }
-        </Geographies>
+      <div className="map-svg-container">
+        <ComposableMap
+          projection="geoMercator"
+          projectionConfig={{ rotate: [-127.5, -36.0, 0], scale: 6500 }}
+          style={{ width: "100%", height: "100%" }}
+        >
+          <Geographies geography={geoUrl}>
+            {({ geographies }) =>
+              geographies.map((geo) => (
+                <Geography
+                  key={geo.rsmKey}
+                  geography={geo}
+                  fill="#fdfdfd"
+                  stroke="#efeff4"
+                  strokeWidth={0.5}
+                  style={{ 
+                    default: { outline: "none" }, 
+                    hover: { fill: "#f2f2f7", outline: "none" } 
+                  }}
+                />
+              ))
+            }
+          </Geographies>
 
-        {mountains.map((m, idx) => {
-          const isCompleted = m.climb_date && m.climb_date !== 'null';
-          if (!m.lng || !m.lat) return null;
-          return (
-            <Marker key={idx} coordinates={[m.lng, m.lat]} onClick={() => onSelect(m)}>
-              <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }} className="marker">
-                {isCompleted ? (
-                  <Flag size={14} className="marker-flag" style={{ transform: 'translate(-7px, -14px)' }} />
-                ) : (
-                  <circle r={2.5} className="marker-dot" />
-                )}
-              </motion.g>
-            </Marker>
-          );
-        })}
-      </ComposableMap>
+          {mountains.map((m, idx) => {
+            const isCompleted = m.climb_date && m.climb_date !== 'null';
+            if (!m.lng || !m.lat) return null;
+            return (
+              <Marker 
+                key={idx} 
+                coordinates={[m.lng, m.lat]} 
+                onClick={() => onSelect(m)}
+                onMouseEnter={() => onHover(m)}
+                onMouseLeave={() => onHover(null)}
+              >
+                <motion.g 
+                  initial={{ scale: 0 }} 
+                  animate={{ scale: 1 }} 
+                  whileHover={{ scale: 1.5 }}
+                  className="marker"
+                >
+                  {isCompleted ? (
+                    <Flag size={14} className="marker-flag" style={{ transform: 'translate(-7px, -14px)' }} />
+                  ) : (
+                    <circle r={3} className="marker-dot" style={{ fill: '#d1d1d6', opacity: 0.6 }} />
+                  )}
+                </motion.g>
+              </Marker>
+            );
+          })}
+        </ComposableMap>
+      </div>
     </div>
   </motion.div>
 );
@@ -260,6 +297,32 @@ const ListSection = ({ mountains, searchTerm, setSearchTerm, onSelect }) => (
         <ChevronRight size={18} color="var(--border)" />
       </div>
     ))}
+  </motion.div>
+);
+
+const MapTooltip = ({ mountain, position }) => (
+  <motion.div 
+    initial={{ opacity: 0, scale: 0.8 }}
+    animate={{ opacity: 1, scale: 1 }}
+    exit={{ opacity: 0, scale: 0.8 }}
+    className="map-tooltip"
+    style={{ 
+      left: position.x + 20, 
+      top: position.y - 60 
+    }}
+  >
+    <h4>{mountain.name}</h4>
+    <div className="tooltip-meta">
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <MapPin size={12} /> {mountain.province}
+      </div>
+      <div>해발 {mountain.height}m</div>
+      {mountain.climb_date && mountain.climb_date !== 'null' ? (
+        <div className="badge" style={{ background: '#e8f7ed', color: 'var(--success)' }}>등반 완료</div>
+      ) : (
+        <div className="badge">미등정</div>
+      )}
+    </div>
   </motion.div>
 );
 
