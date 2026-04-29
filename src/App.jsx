@@ -21,7 +21,7 @@ import {
   Flower2,
   Award,
   ArrowUpCircle,
-  Map as MapIcon2
+  Clock
 } from 'lucide-react';
 import {
   ComposableMap,
@@ -106,20 +106,15 @@ const App = () => {
   const stats = useMemo(() => {
     const completedList = mountains.filter(m => m.climb_date && m.climb_date !== 'null');
     const completed = completedList.length;
-    const totalDistance = logs.reduce((acc, log) => acc + (parseFloat(log.distance) || 0), 0);
-    
-    const highestPeak = completedList.length > 0 
-      ? completedList.reduce((max, m) => parseInt(m.height) > parseInt(max.height) ? m : max, completedList[0])
-      : null;
+    const totalRemaining = mountains.length - completed;
 
     return {
       completed,
       total: mountains.length,
-      distance: totalDistance.toFixed(1),
-      percent: Math.round((completed / mountains.length) * 100),
-      highestPeak
+      remaining: totalRemaining,
+      percent: Math.round((completed / mountains.length) * 100)
     };
-  }, [mountains, logs]);
+  }, [mountains]);
 
   const groupedLogs = useMemo(() => {
     if (!logs.length) return [];
@@ -129,8 +124,10 @@ const App = () => {
     
     sorted.forEach(log => {
       const lastGroup = groups[groups.length - 1];
-      const dist = parseFloat(log.distance) || 0;
-      const mountain = mountains.find(m => m.name.includes(log.location));
+      const mountain = mountains.find(m => (m.name || "").includes(log.location));
+      
+      // In this specific dataset, 'distance' field often contains names and 'time' field often contains actual distance
+      const rawCompanions = log.distance && typeof log.distance === 'string' ? log.distance : '';
       
       if (lastGroup && lastGroup.location === log.location) {
         const lastDate = new Date(lastGroup.date);
@@ -140,14 +137,13 @@ const App = () => {
         if (diffDays <= 2) {
           lastGroup.isMerged = true;
           lastGroup.endDate = lastGroup.endDate || lastGroup.date;
-          lastGroup.date = log.date; // Use earlier date as base
-          lastGroup.totalDistance = (parseFloat(lastGroup.totalDistance) + dist).toFixed(1);
+          lastGroup.date = log.date; 
           return;
         }
       }
       groups.push({ 
         ...log, 
-        totalDistance: dist.toFixed(1), 
+        companionsOverride: rawCompanions,
         mountainInfo: mountain 
       });
     });
@@ -266,16 +262,15 @@ const HomeSection = ({ stats, recentLogs, onSelect }) => (
       </div>
       <div className="stat-grid" style={{ marginTop: '1.5rem' }}>
         <div className="stat-item">
-          <span className="stat-label">완료</span>
+          <span className="stat-label">현재 완료</span>
           <div className="stat-value">
             {stats.completed}<span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 400 }}> / {stats.total}</span>
           </div>
         </div>
         <div className="stat-item">
-          <span className="stat-label">최고 고도 (기념)</span>
-          <div className="stat-value" style={{ fontSize: '1.2rem' }}>
-            {stats.highestPeak ? stats.highestPeak.name : '없음'}
-            {stats.highestPeak && <span style={{ fontSize: '0.8rem', color: 'var(--success)', marginLeft: '4px' }}>{stats.highestPeak.height}m</span>}
+          <span className="stat-label">남은 도전</span>
+          <div className="stat-value" style={{ color: 'var(--primary)' }}>
+            {stats.remaining}<span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 400 }}> 곳</span>
           </div>
         </div>
       </div>
@@ -283,9 +278,8 @@ const HomeSection = ({ stats, recentLogs, onSelect }) => (
 
     <h3 style={{ margin: '1.5rem 0 1rem' }}>최근 등반 기록</h3>
     {recentLogs.length > 0 ? recentLogs.map((log, i) => {
-      const companionList = log.companions && log.companions !== 'null' 
-        ? log.companions.split('/').map(name => `+${name.trim()}`).join(' ')
-        : '';
+      const compStr = log.companionsOverride || "";
+      const companionList = compStr ? compStr.split('/').map(name => `+${name.trim()}`).join(' ') : '';
         
       return (
         <div key={i} className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center', cursor: 'pointer' }} onClick={() => log.mountainInfo && onSelect(log.mountainInfo)}>
@@ -296,16 +290,15 @@ const HomeSection = ({ stats, recentLogs, onSelect }) => (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{log.location}</div>
               <span className="badge" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>{log.mountainInfo?.province}</span>
-              {log.mountainInfo?.height && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{log.mountainInfo.height}m</span>}
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
               {log.isMerged ? `${log.date.split('T')[0]} ~ ${log.endDate.split('T')[0]}` : log.date.split('T')[0]}
             </div>
           </div>
-          <div style={{ textAlign: 'right', minWidth: '100px' }}>
+          <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600, marginBottom: '2px' }}>{companionList}</div>
-            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{log.totalDistance}km</div>
-            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>누적 거리</div>
+            <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>{log.mountainInfo?.height}m</div>
+            <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>해발 고도</div>
           </div>
         </div>
       );
